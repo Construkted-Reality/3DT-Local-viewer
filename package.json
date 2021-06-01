@@ -1,0 +1,56 @@
+{
+  "name": "3dt-local-viewer",
+  "version": "1.0.0",
+  "description": "3DT-Local-viewer is a standalone application to display Cesium 3d tileset",
+  "main": "index.js",
+  "repository": "https://github.com/Construkted-Reality/3DT-Local-viewer",
+  "author": "3DGISKing <wugis1219@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "electron-squirrel-startup": "^1.0.0",
+    "express": "^4.17.1",
+    "request": "^2.88.2",
+    "yargs": "^17.0.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^6.0.0-beta.57",
+    "@electron-forge/maker-deb": "^6.0.0-beta.57",
+    "@electron-forge/maker-rpm": "^6.0.0-beta.57",
+    "@electron-forge/maker-squirrel": "^6.0.0-beta.57",
+    "@electron-forge/maker-zip": "^6.0.0-beta.57",
+    "electron": "^12.0.8"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {},
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "3dt_local_viewer"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "darwin"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "config": {}
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "config": {}
+        }
+      ]
+    }
+  }
+}
