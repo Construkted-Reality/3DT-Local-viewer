@@ -8,7 +8,7 @@ const isWindows = process.platform === "win32";
 
 let mainWindow;
 
-const openDevTool = false;
+const openDevTool = true;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -84,7 +84,7 @@ ipcMain.on(`select-3d-tile-folder`, function (e, args) {
         stopServer();
         startServer(port, path[0]);
 
-        mainWindow.webContents.executeJavaScript("window.theApp.addTileset()");
+        mainWindow.webContents.executeJavaScript("window.tilesetViewer.addTileset('http://localhost:3000/tileset.json')");
     }
 });
 

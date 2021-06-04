@@ -13,6 +13,13 @@
     <link rel="stylesheet" href="style.css" />
     <script src="https://kit.fontawesome.com/1c9144b004.js" crossorigin="anonymous"></script>
 
+<!--    https://stackoverflow.com/questions/32621988/electron-jquery-is-not-defined-->
+    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+
+    <script src="vendor/jquery.min.js"></script>
+
+    <script>if (window.module) module = window.module;</script>
+
     <link rel="stylesheet" href="./Cesium-1.81/Build/Cesium/Widgets/widgets.css">
     <script src="./Cesium-1.81/Build/Cesium/Cesium.js"></script>
     <script src="./CesiumMeasurementPlugin.js"></script>
@@ -44,11 +51,7 @@
         </button>
     </div>
 
-    <script type="module">
-        import {App} from "./app.js";
-
-        window.theApp = new App();
-    </script>
+    <script src="./app.js"></script>
 
     <script src="./renderer.js"></script>
 </body>
