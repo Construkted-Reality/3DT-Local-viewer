@@ -20,15 +20,12 @@
 
     <script>if (window.module) module = window.module;</script>
 
+    <link rel="stylesheet" href="./vendor/bootstrap-4.1.3.css">
+
     <link rel="stylesheet" href="./Cesium-1.81/Build/Cesium/Widgets/widgets.css">
     <script src="./Cesium-1.81/Build/Cesium/Cesium.js"></script>
     <script src="./CesiumMeasurementPlugin.js"></script>
 
-    <style>
-        html, body, #cesiumContainer {
-            width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
-        }
-    </style>
 </head>
 
 <body>
@@ -45,10 +42,81 @@
     </div>
 
     <div id="cesiumContainer" class="fullSize"></div>
-    <div style="position: absolute; top: 50px; left: 10px">
+    <div style="position: absolute; top: 90px; left: 10px">
         <button id="select-3d-tileset" type="button">
             Select 3D Tileset Folder
         </button>
+    </div>
+
+    <div id="side-menu-bar-wrapper">
+        <div class="bst4-wrapper">
+            <div class="container-fluid">
+                <nav id="navbar-right" class="navbar-right bg-light p-3">
+                    <span>Tools</span>
+                    <ul class="nav flex-column">
+
+                        <li class="nav-item" id="nav-settings">
+                            <span class="btn btn-light gwicon-gear" id="construkted-popup-settings-btn" title="Settings"></span>
+                        </li>
+                    </ul>
+                </nav>
+
+                <div id="construkted-popup-settings" class="popup-wrapper" style="display: none;">
+                    <div class="popup-content">
+                        <h3 class="popup-title">Settings <span class="close-btn">×</span></h3>
+
+                        <div class="content-wrapper">
+                            <div class="form-group">
+                                <label for="display_performance"><strong>Display</strong></label>
+                                <br>Rendering performance
+                                <input type="range" id="maximum-screen-space-error-slider" class="form-control-range"
+                                       name="display_performance" min="2" max="32" value="16">
+                                <div class="label-min-max">
+                                    <span class="lbl-min">Performance</span>
+                                    <span class="lbl-max" style="float:right">Quality</span>
+                                </div>
+                            </div>
+
+                            <hr style="width:100%;text-align:left;margin-left:0">
+
+                            <div class="form-group">
+                                <label for="fpv_speed"><strong>FLY / FPV Movement</strong></label>
+                                <br>Movement Speed
+                                <input type="range" id="fpv-movement-speed-slider" class="form-control-range" name="fpv_speed" min="0.01" max="2" value="0.4" step="0.01">
+
+                                <div class="label-min-max">
+                                    <span class="lbl-min">Slow</span>
+                                    <span class="lbl-max" style="float:right">Fast</span>
+                                </div>
+                            </div>
+
+                            <!-- These buttons should only be visible to the asset owner (logged in) -->
+
+                            <!-- This checkbox should only be visible by an admin user only!-->
+                            <hr style="width:100%;text-align:left;margin-left:0">
+
+                            <strong>Advanced Performance Settings</strong>
+                            <p class="desc">Extra knobsd and switches to adjust the display quality and performnace.</p>
+
+                            <div class="form-check">
+                                <input class="form-check-input" id="fxaa-enable-checkbox" type="checkbox" checked>
+                                <label class="form-check-label" for="fxaa-enable-checkbox">
+                                    Anti-Aliasing
+                                </label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" id="show-hide-wireframe-checkbox" type="checkbox">
+                                <label class="form-check-label" for="show-hide-wireframe-checkbox">
+                                    Show Wireframe
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
     </div>
 
     <script src="./app.js"></script>

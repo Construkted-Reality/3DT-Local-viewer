@@ -5,3 +5,4 @@ out/
 /web-page/node_modules
 /web-page/app.js
 /web-page/app.js.map
+/web-page/yarn.lock

@@ -7,6 +7,8 @@ import {
 } from "./CesiumJsInc.js";
 
 import {geoReferenced} from "./util";
+import {CesiumFLYCameraController} from "./CesiumFLYCameraController";
+import {NavigationControlbar} from "./NavigationControlbar"
 
 class TilesetViewer {
     constructor() {
@@ -14,11 +16,15 @@ class TilesetViewer {
             imageryProvider: false,
             animation: false,
             homeButton: false, //  the HomeButton widget will not be created.
+
+            // note that If set to false, credit display will not show
             baseLayerPicker: true, // If set to false, the BaseLayerPicker widget will not be created.
             geocoder: false,
             sceneModePicker: false,
-            timeline: true,
+            timeline: false,
         });
+
+        this._viewer = viewer;
 
         const scene = viewer.scene;
 
@@ -33,7 +39,7 @@ class TilesetViewer {
 
         jQuery(".cesium-toolbar-button").hide();
 
-        viewer.scene.preUpdate.addEventListener(function (scene, time) {
+        viewer.scene.postUpdate.addEventListener(function (scene, time) {
             const creditContainer = viewer.bottomContainer;
 
             jQuery("a[href='https://cesium.com/']").attr('href', "https://cesium.com/cesiumjs/");
@@ -41,7 +47,25 @@ class TilesetViewer {
 
             jQuery("img[title='Cesium ion']").attr('src', cesiumjsIcon);
             jQuery(".cesium-credit-textContainer").hide();
+            jQuery(".cesium-credit-expand-link").show();
             jQuery(".cesium-credit-expand-link").html("Map data attribution");
+        });
+
+        this._flyController = new CesiumFLYCameraController({
+            isMobile: false,
+            cesiumViewer: this._viewer
+        });
+
+        const controlbarContainer = document.createElement("div");
+
+        controlbarContainer.className = "construkted-viewer-controlbarContainer";
+
+        this._viewer.container.appendChild(controlbarContainer);
+
+        const controlbar = new NavigationControlbar({
+            viewer: this._viewer,
+            container: controlbarContainer,
+            flyController: this._flyController,
         });
 
         viewer.extend(Cesium.viewerMeasureMixin, {
@@ -52,7 +76,7 @@ class TilesetViewer {
             })
         });
 
-        this._viewer = viewer;
+        this._tilesetLoadError = new Cesium.Event();
     }
 
     addTileset(tilesetJsonUrl) {
@@ -79,9 +103,8 @@ class TilesetViewer {
             else {
                 tileset.modelMatrix = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(0, 0));
             }
-
-            console.log(tileset.boundingSphere);
         }).otherwise((error) => {
+            this._tilesetLoadError.raiseEvent(error);
             console.error(error);
         });
     }
@@ -91,6 +114,19 @@ class TilesetViewer {
 
         viewer.zoomTo(tileset);
     }
+
+    get viewer () {
+        return this._viewer;
+    }
+
+    get flyController() {
+        return this._flyController;
+    }
+
+    get tilesetLoadError() {
+        return this._tilesetLoadError;
+    }
+
 }
 
 export {TilesetViewer};

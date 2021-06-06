@@ -30,6 +30,7 @@ gulp.task('default', gulp.parallel("pack", "webserver", async function() {
 
 	let watchlist = [
 		'./index.html',
+		'./style.css',
 		'src/config.json',
 		'src/*.js',
 		'src/*/*.js',

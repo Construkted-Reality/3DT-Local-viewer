@@ -5,8 +5,6 @@ const {remote} = require("electron");
  * const { dialog } = require("electron").remote.dialog;
  */
 
-const dialog = remote.dialog;
-
 const ipcRenderer = require('electron').ipcRenderer;
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -44,4 +42,8 @@ window.addEventListener("DOMContentLoaded", () => {
     document.querySelector('#select-3d-tileset').addEventListener('click', function (event) {
         ipcRenderer.send('select-3d-tile-folder')
     });
+
+    window.tilesetViewer.tilesetLoadError.addEventListener((error) => {
+        ipcRenderer.send('tileset-load-error')
+    })
 });

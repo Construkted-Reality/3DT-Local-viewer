@@ -55,36 +55,39 @@ ipcMain.on(`display-app-menu`, function (e, args) {
     }
 });
 
-ipcMain.on(`select-3d-tile-folder`, function (e, args) {
+ipcMain.on(`select-3d-tile-folder`, (e, args) => {
     if (isWindows && mainWindow) {
         const options = {
-            title: 'Select a folder contains a tileset.json',
-            properties: ['openDirectory'],
+            title: 'Select a tileset json file',
+            properties: ['openFile'],
         };
 
-        const path = dialog.showOpenDialogSync(mainWindow, options);
+        const tilesetPath = dialog.showOpenDialogSync(mainWindow, options);
 
-        if(!path)
+        if(!tilesetPath)
             return;
 
-        if(!fs.existsSync(path +'/tileset.json')){
-            const messageBoxOptions = {
-                type: "error",
-                title: "Error",
-                message: path + " does not contain tileset.json!"
-            };
-
-            dialog.showMessageBoxSync(messageBoxOptions);
-
-            return;
-        }
+        const dir = path.dirname(tilesetPath[0]);
+        const baseName = path.basename(tilesetPath[0]);
 
         const port = 3000;
 
         stopServer();
-        startServer(port, path[0]);
+        startServer(port, dir);
 
-        mainWindow.webContents.executeJavaScript("window.tilesetViewer.addTileset('http://localhost:3000/tileset.json')");
+        const tilesetUrl = `http://localhost:${port}/${baseName}`;
+
+        mainWindow.webContents.executeJavaScript(`window.tilesetViewer.addTileset("${tilesetUrl}")`);
     }
+});
+
+ipcMain.on('tileset-load-error', () => {
+    const messageBoxOptions = {
+        type: "error",
+        title: "Error",
+        message: "failed to load tileset!"
+    };
+
+    dialog.showMessageBoxSync(messageBoxOptions);
 });
 

@@ -27,4 +27,28 @@ function geoReferenced(tileset) {
     return true;
 }
 
-export {geoReferenced}
+function disableDefaultScreenSpaceCameraController (scene) {
+    // disable the default event handlers
+
+    scene.screenSpaceCameraController.enableRotate = false;
+    scene.screenSpaceCameraController.enableTranslate = false;
+    scene.screenSpaceCameraController.enableZoom = false;
+    scene.screenSpaceCameraController.enableTilt = false;
+    scene.screenSpaceCameraController.enableLook = false;
+}
+
+function enableDefaultScreenSpaceCameraController (scene) {
+    // enable the default event handlers
+
+    scene.screenSpaceCameraController.enableRotate = true;
+    scene.screenSpaceCameraController.enableTranslate = true;
+    scene.screenSpaceCameraController.enableZoom = true;
+    scene.screenSpaceCameraController.enableTilt = true;
+    scene.screenSpaceCameraController.enableLook = true;
+}
+
+export {
+    disableDefaultScreenSpaceCameraController,
+    enableDefaultScreenSpaceCameraController,
+    geoReferenced
+}

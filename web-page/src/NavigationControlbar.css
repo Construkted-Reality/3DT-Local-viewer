@@ -1,0 +1,35 @@
+.construkted-viewer-controlbarContainer {
+    display: block;
+    position: absolute;
+    top: 15px;
+    left: 0;
+    width: 100%;
+    height: 33px;
+    background-color: transparent;
+
+    /*
+        override .airkit_single-post .featured-image, .page .featured-image
+        text-align center
+    */
+    text-align: left !important;
+}
+
+.construkted-viewer-controlbar-button {
+    background-color: rgba(60, 80, 105,.3);
+    border: 1px solid #fff;
+    color: #edffff;
+    border-radius: 5px;
+    padding: 3px 7px;
+    cursor: pointer;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    margin-top: 3px;
+    margin-left: 2px;
+    margin-right: 2px;
+}
+
+.construkted-viewer-controlbar-button:first-child {
+    margin-left: 20px;
+}
