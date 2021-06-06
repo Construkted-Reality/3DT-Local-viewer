@@ -8,7 +8,7 @@ const isWindows = process.platform === "win32";
 
 let mainWindow;
 
-const openDevTool = true;
+const openDevTool = false;
 
 function createWindow() {
     mainWindow = new BrowserWindow({

@@ -1,5 +1,12 @@
 # Change Log
 
+### 1.0.3 - 2021-06-06
+
+#### Fixed
+
+- Orbit mouse button functions. [5](https://github.com/Construkted-Reality/3DT-Local-viewer/issues/5)
+- Measure buttons. [4](https://github.com/Construkted-Reality/3DT-Local-viewer/issues/4)
+
 ### 1.0.2 - 2021-06-06
 
 #### Changed

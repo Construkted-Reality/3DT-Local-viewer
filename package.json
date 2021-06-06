@@ -1,6 +1,6 @@
 {
   "name": "3dt-local-viewer",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "3DT-Local-viewer is a standalone application to display Cesium 3d tileset",
   "main": "index.js",
   "repository": "https://github.com/Construkted-Reality/3DT-Local-viewer",

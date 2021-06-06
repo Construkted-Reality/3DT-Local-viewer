@@ -1,7 +1,9 @@
 import {
+    CameraEventType,
     Cartesian3,
     Cesium3DTileset,
     Color,
+    KeyboardEventModifier,
     Transforms,
     Viewer,
 } from "./CesiumJsInc.js";
@@ -38,6 +40,21 @@ class TilesetViewer {
         // customize credit display
 
         jQuery(".cesium-toolbar-button").hide();
+
+        viewer.scene.screenSpaceCameraController.rotateEventTypes = CameraEventType.LEFT_DRAG;
+        viewer.scene.screenSpaceCameraController.zoomEventTypes = [CameraEventType.MIDDLE_DRAG, CameraEventType.WHEEL, CameraEventType.PINCH];
+
+        viewer.scene.screenSpaceCameraController.tiltEventTypes = [
+            CameraEventType.RIGHT_DRAG, CameraEventType.PINCH,
+            {
+                eventType: CameraEventType.RIGHT_DRAG,
+                modifier: KeyboardEventModifier.CTRL
+            },
+            {
+                eventType: CameraEventType.LEFT_DRAG,
+                modifier: KeyboardEventModifier.CTRL
+            }
+        ];
 
         viewer.scene.postUpdate.addEventListener(function (scene, time) {
             const creditContainer = viewer.bottomContainer;
