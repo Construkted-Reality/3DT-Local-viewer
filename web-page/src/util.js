@@ -1,6 +1,6 @@
 import {
     Cartographic,
-
+    Math as CesiumMath
 } from "./CesiumJsInc.js";
 
 function geoReferenced(tileset) {

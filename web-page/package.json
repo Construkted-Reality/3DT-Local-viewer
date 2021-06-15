@@ -1,6 +1,6 @@
 {
   "name": "web-page",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "",
   "main": "CesiumMeasurementPlugin.js",
   "scripts": {
