@@ -3,6 +3,7 @@ import {
     Cartesian3,
     Cesium3DTileset,
     Color,
+    Ion,
     KeyboardEventModifier,
     Transforms,
     Viewer,
@@ -14,6 +15,9 @@ import {NavigationControlbar} from "./NavigationControlbar"
 
 class TilesetViewer {
     constructor() {
+        // construkted token
+        Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2M…jk1fQ.jMg72t7Gnkk4-E9G7zhd_CoTJBUJ39hHALmxGBRL1ok";
+
         const viewer = new Viewer("cesiumContainer", {
             imageryProvider: false,
             animation: false,

@@ -9,8 +9,14 @@ The viewer is based on [CesiumJS](https://github.com/CesiumGS/cesium) renderer
 - No internet connection is required,
 - Basic measurement tools.
 
+## How to start web page in hot reload mode
+  1 make sure that config.runMode is "web"
+  2 go to the root web-page folder(port 1237, 3000 should be free).
+
+    yarn start
+
 ## How to run an electron executable in development mode.
-  go to the root folder and run these commands.
+  go to the root folder and run these commands(port 3000 should be free).
   
     yarn install
     yarn start
