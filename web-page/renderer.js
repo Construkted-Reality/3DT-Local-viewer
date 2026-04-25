@@ -1,12 +1,3 @@
-const {remote} = require("electron");
-/**
- *
- * note that following does not work
- * const { dialog } = require("electron").remote.dialog;
- */
-
-const ipcRenderer = require('electron').ipcRenderer;
-
 window.addEventListener("DOMContentLoaded", () => {
     const menuButton = document.getElementById("menu-btn");
     const minimizeButton = document.getElementById("minimize-btn");
@@ -14,19 +5,18 @@ window.addEventListener("DOMContentLoaded", () => {
     const closeButton = document.getElementById("close-btn");
 
     menuButton.addEventListener("click", e => {
-        window.openMenu(e.x, e.y);
+        window.api.openMenu(e.x, e.y);
     });
 
-    minimizeButton.addEventListener("click", e => {
-        window.minimizeWindow();
+    minimizeButton.addEventListener("click", () => {
+        window.api.minimizeWindow();
     });
 
-    maxUnmaxButton.addEventListener("click", e => {
+    maxUnmaxButton.addEventListener("click", async () => {
         const icon = maxUnmaxButton.querySelector("i.far");
-
-        window.maxUnmaxWindow();
-
-        if (window.isWindowMaximized()) {
+        window.api.maxUnmaxWindow();
+        const maximized = await window.api.isWindowMaximized();
+        if (maximized) {
             icon.classList.remove("fa-square");
             icon.classList.add("fa-clone");
         } else {
@@ -35,15 +25,15 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    closeButton.addEventListener("click", e => {
-        window.closeWindow();
+    closeButton.addEventListener("click", () => {
+        window.api.closeWindow();
     });
 
-    document.querySelector('#select-3d-tileset').addEventListener('click', function (event) {
-        ipcRenderer.send('select-3d-tile-folder')
+    document.querySelector('#select-3d-tileset').addEventListener('click', () => {
+        window.api.selectTileset();
     });
 
-    window.tilesetViewer.tilesetLoadError.addEventListener((error) => {
-        ipcRenderer.send('tileset-load-error')
-    })
+    window.tilesetViewer.tilesetLoadError.addEventListener(() => {
+        window.api.notifyTilesetLoadError();
+    });
 });

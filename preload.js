@@ -1,27 +1,12 @@
-const {remote} = require("electron");
-/**
- *
- * note that following does not work
- * const { dialog } = require("electron").remote.dialog;
- */
-const dialog = remote.dialog;
+const { contextBridge, ipcRenderer } = require("electron");
 
-const {
-    getCurrentWindow,
-    openMenu,
-    minimizeWindow,
-    maximizeWindow,
-    unmaximizeWindow,
-    maxUnmaxWindow,
-    isWindowMaximized,
-    closeWindow
-} = require("./menu-functions");
-
+// Forward console.error with deep-stringified Errors so they survive
+// the main-process console-message bridge as readable text.
 const origError = console.error;
-console.error = function(...args) {
+console.error = function (...args) {
     const formatted = args.map(a => {
         if (a instanceof Error) return `${a.name}: ${a.message}\n${a.stack}`;
-        if (typeof a === 'object' && a !== null) {
+        if (typeof a === "object" && a !== null) {
             try { return JSON.stringify(a, Object.getOwnPropertyNames(a)); }
             catch { return String(a); }
         }
@@ -30,15 +15,12 @@ console.error = function(...args) {
     origError.apply(console, formatted);
 };
 
-window.addEventListener("DOMContentLoaded", () => {
-    window.getCurrentWindow = getCurrentWindow;
-    window.openMenu = openMenu;
-    window.minimizeWindow = minimizeWindow;
-    window.maximizeWindow = maximizeWindow;
-    window.unmaximizeWindow = unmaximizeWindow;
-    window.maxUnmaxWindow = maxUnmaxWindow;
-    window.isWindowMaximized = isWindowMaximized;
-    window.closeWindow = closeWindow;
-
-
+contextBridge.exposeInMainWorld("api", {
+    openMenu: (x, y) => ipcRenderer.send("display-app-menu", { x, y }),
+    minimizeWindow: () => ipcRenderer.send("window-minimize"),
+    maxUnmaxWindow: () => ipcRenderer.send("window-max-unmax"),
+    closeWindow: () => ipcRenderer.send("window-close"),
+    isWindowMaximized: () => ipcRenderer.invoke("window-is-maximized"),
+    selectTileset: () => ipcRenderer.send("select-3d-tile-folder"),
+    notifyTilesetLoadError: () => ipcRenderer.send("tileset-load-error"),
 });

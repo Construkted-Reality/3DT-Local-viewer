@@ -1,5 +1,22 @@
 # Change Log
 
+### 1.2.0 - 2026-04-25
+
+#### Changed
+
+- Upgraded Electron 12 → 41 (current stable). Electron 12 was EOL in May 2022.
+- Upgraded electron-forge 6.0.0-beta.57 → 7.11.
+
+#### Security
+
+- Renderer process now runs with `contextIsolation: true`, `nodeIntegration: false`, and no `remote` module access. Renderer talks to main exclusively through a typed `contextBridge` surface (`window.api`).
+- Tileset URL is JSON-escaped before being interpolated into `webContents.executeJavaScript`, removing a path-injection vector.
+
+#### Removed
+
+- Unused dependencies: `request` (deprecated package), `yargs`, `electron-squirrel-startup`.
+- `menu-functions.js`: superseded by IPC handlers in the main process and the preload `contextBridge` surface.
+
 ### 1.1.0 - 2026-04-25
 
 #### Changed
