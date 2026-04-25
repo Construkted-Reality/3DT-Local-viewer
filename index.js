@@ -25,8 +25,13 @@ function createWindow() {
 
     mainWindow.loadFile('./web-page/index.html');
 
+    mainWindow.webContents.on('console-message', (e, level, message, line, sourceId) => {
+        const levels = ['LOG', 'WARN', 'ERROR'];
+        console.log(`[renderer ${levels[level] || level}] ${message} (${sourceId}:${line})`);
+    });
+
     if(openDevTool)
-        mainWindow.webContents.openDevTools();
+        mainWindow.webContents.openDevTools({mode: 'detach'});
 }
 
 app.whenReady().then(() => {
@@ -56,29 +61,30 @@ ipcMain.on(`display-app-menu`, function (e, args) {
 });
 
 ipcMain.on(`select-3d-tile-folder`, (e, args) => {
-    if (isWindows && mainWindow) {
-        const options = {
-            title: 'Select a tileset json file',
-            properties: ['openFile'],
-        };
+    if (!mainWindow)
+        return;
 
-        const tilesetPath = dialog.showOpenDialogSync(mainWindow, options);
+    const options = {
+        title: 'Select a tileset json file',
+        properties: ['openFile'],
+    };
 
-        if(!tilesetPath)
-            return;
+    const tilesetPath = dialog.showOpenDialogSync(mainWindow, options);
 
-        const dir = path.dirname(tilesetPath[0]);
-        const baseName = path.basename(tilesetPath[0]);
+    if(!tilesetPath)
+        return;
 
-        const port = 3000;
+    const dir = path.dirname(tilesetPath[0]);
+    const baseName = path.basename(tilesetPath[0]);
 
-        stopServer();
-        startServer(port, dir);
+    const port = 3000;
 
-        const tilesetUrl = `http://localhost:${port}/${baseName}`;
+    stopServer();
+    startServer(port, dir);
 
-        mainWindow.webContents.executeJavaScript(`window.tilesetViewer.addTileset("${tilesetUrl}")`);
-    }
+    const tilesetUrl = `http://localhost:${port}/${baseName}`;
+
+    mainWindow.webContents.executeJavaScript(`window.tilesetViewer.addTileset("${tilesetUrl}")`);
 });
 
 ipcMain.on('tileset-load-error', () => {
