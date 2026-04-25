@@ -1,5 +1,27 @@
 # Change Log
 
+### 1.1.0 - 2026-04-25
+
+#### Changed
+
+- Upgraded bundled CesiumJS from 1.81 to 1.140. Required for tilesets using the 3D Tiles 1.1 spec (e.g. UltraMesh 2.x output).
+- `Cesium3DTileset` now loaded via the modern async `Cesium3DTileset.fromUrl()` API.
+
+#### Fixed
+
+- "Select 3D tiles JSON file" now works on Linux and macOS (was previously gated to Windows only).
+- Cleared corrupted Cesium ion access token that contained a literal `…` character mid-JWT and produced a 401 on every launch.
+
+#### Removed
+
+- Measurement tools temporarily disabled: the bundled `CesiumMeasurementPlugin.js` is incompatible with Cesium 1.140 and needs replacement. See `TODO` in `web-page/src/TilesetViewer.js`.
+- Default BaseLayerPicker disabled (was attempting to load Cesium ion's asset catalog, which is unnecessary for local-only tileset viewing).
+
+#### Internal
+
+- Renamed `CHAGELOG.md` to `CHANGELOG.md`.
+- Renderer-process console output is now forwarded to the main-process log to aid debugging on frameless windows.
+
 ### 1.0.5 - 2022-10-28
 
 #### Fixed

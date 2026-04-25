@@ -25,8 +25,13 @@ function createWindow() {
 
     mainWindow.loadFile('./web-page/index.html');
 
+    mainWindow.webContents.on('console-message', (e, level, message, line, sourceId) => {
+        const levels = ['LOG', 'WARN', 'ERROR'];
+        console.log(`[renderer ${levels[level] || level}] ${message} (${sourceId}:${line})`);
+    });
+
     if(openDevTool)
-        mainWindow.webContents.openDevTools();
+        mainWindow.webContents.openDevTools({mode: 'detach'});
 }
 
 app.whenReady().then(() => {

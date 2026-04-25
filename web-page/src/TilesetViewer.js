@@ -15,8 +15,7 @@ import {NavigationControlbar} from "./NavigationControlbar"
 
 class TilesetViewer {
     constructor() {
-        // construkted token
-        Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2M…jk1fQ.jMg72t7Gnkk4-E9G7zhd_CoTJBUJ39hHALmxGBRL1ok";
+        Ion.defaultAccessToken = "";
 
         const viewer = new Viewer("cesiumContainer", {
             imageryProvider: false,
@@ -24,7 +23,7 @@ class TilesetViewer {
             homeButton: false, //  the HomeButton widget will not be created.
 
             // note that If set to false, credit display will not show
-            baseLayerPicker: true, // If set to false, the BaseLayerPicker widget will not be created.
+            baseLayerPicker: false,
             geocoder: false,
             sceneModePicker: false,
             timeline: false,
@@ -89,13 +88,11 @@ class TilesetViewer {
             flyController: this._flyController,
         });
 
-        viewer.extend(Cesium.viewerMeasureMixin, {
-            units: new Cesium.MeasureUnits({
-                distanceUnits: Cesium.DistanceUnits.METERS,
-                areaUnits: Cesium.AreaUnits.SQUARE_METERS,
-                volumeUnits: Cesium.VolumeUnits.CUBIC_METERS
-            })
-        });
+        // TODO(measurement): re-enable measurement tools.
+        // The previous bundled CesiumMeasurementPlugin.js targeted Cesium 1.81's
+        // internals and breaks against 1.140 (Cesium.EMPTY_OBJECT no longer exposed).
+        // Replace with a current-Cesium-compatible measurement implementation
+        // (or rewrite using the public Cesium API).
 
         this._tilesetLoadError = new Cesium.Event();
     }
@@ -105,26 +102,19 @@ class TilesetViewer {
 
         if(this._tileset) {
             viewer.scene.primitives.remove(this._tileset);
+            this._tileset = undefined;
         }
 
-        const tileset = new Cesium3DTileset({
-            url: tilesetJsonUrl
-        });
+        Cesium3DTileset.fromUrl(tilesetJsonUrl).then((tileset) => {
+            viewer.scene.primitives.add(tileset);
+            this._tileset = tileset;
 
-        viewer.scene.primitives.add(tileset);
-
-        this._tileset = tileset;
-
-        tileset.readyPromise.then(() => {
-            this._onTilesetReady(tileset);
-
-            if (geoReferenced(tileset)) {
-
-            }
-            else {
+            if (!geoReferenced(tileset)) {
                 tileset.modelMatrix = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(0, 0));
             }
-        }).otherwise((error) => {
+
+            this._onTilesetReady(tileset);
+        }).catch((error) => {
             this._tilesetLoadError.raiseEvent(error);
             console.error(error);
         });
