@@ -1,17 +1,24 @@
 import {Cesium3DTileset} from "./CesiumJsInc.js";
 
 function initSettingsPopup() {
-    jQuery('#maximum-screen-space-error-slider').change(function () {
+    const sseSlider = jQuery('#maximum-screen-space-error-slider');
+
+    sseSlider.on('input change', function () {
         const scene = window.tilesetViewer.viewer.scene;
+        const sse = Math.max(1, 32 - parseFloat(this.value));
 
         for (let i = 0; i < scene.primitives.length; ++i) {
             const primitive = scene.primitives.get(i);
 
             if(primitive instanceof Cesium3DTileset)
-                primitive.maximumScreenSpaceError = 32 - this.value;
+                primitive.maximumScreenSpaceError = sse;
         }
 
         scene.requestRender();
+    });
+
+    window.tilesetViewer.tilesetLoaded.addEventListener((tileset) => {
+        sseSlider.val(32 - tileset.maximumScreenSpaceError);
     });
 
     jQuery('#fpv-movement-speed-slider').change(function () {

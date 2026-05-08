@@ -95,6 +95,7 @@ class TilesetViewer {
         // (or rewrite using the public Cesium API).
 
         this._tilesetLoadError = new Cesium.Event();
+        this._tilesetLoaded = new Cesium.Event();
     }
 
     addTileset(tilesetJsonUrl) {
@@ -134,6 +135,7 @@ class TilesetViewer {
         const viewer = this._viewer;
 
         viewer.zoomTo(tileset);
+        this._tilesetLoaded.raiseEvent(tileset);
     }
 
     get viewer () {
@@ -146,6 +148,10 @@ class TilesetViewer {
 
     get tilesetLoadError() {
         return this._tilesetLoadError;
+    }
+
+    get tilesetLoaded() {
+        return this._tilesetLoaded;
     }
 
 }
