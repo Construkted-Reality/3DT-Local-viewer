@@ -109,6 +109,16 @@ class TilesetViewer {
             viewer.scene.primitives.add(tileset);
             this._tileset = tileset;
 
+            tileset.pointCloudShading.attenuation = true;
+            tileset.pointCloudShading.geometricErrorScale = 1.0;
+            tileset.pointCloudShading.maximumAttenuation = undefined; // uses the tile's geometric error
+            tileset.pointCloudShading.baseResolution = undefined;     // computed from geometric error
+            tileset.pointCloudShading.eyeDomeLighting = true;
+            tileset.pointCloudShading.eyeDomeLightingStrength = 1.0;
+            tileset.pointCloudShading.eyeDomeLightingRadius = 1.0;
+            tileset.pointCloudShading.backFaceCulling = false;
+            tileset.pointCloudShading.normalShading = true;
+
             if (!geoReferenced(tileset)) {
                 tileset.modelMatrix = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(0, 0));
             }
