@@ -15,6 +15,12 @@ function initSidebar() {
                 let itemDivID = jQuery(this).attr('id');
                 let popupID = itemDivID.replace('-btn', '');
                 jQuery('#' + popupID).show();
+                jQuery('body').addClass('settings-pane-open');
+
+                // Resize Cesium viewer to fit new container width
+                if (window.tilesetViewer && window.tilesetViewer.viewer) {
+                    window.tilesetViewer.viewer.resize();
+                }
             }
 
             $(this).parent().toggleClass('active').siblings().not(this).removeClass('active');
@@ -26,6 +32,13 @@ function initSidebar() {
 
         closeBtn.click(function () {
             jQuery(this).parents('.popup-wrapper').hide();
+            jQuery('body').removeClass('settings-pane-open');
+
+            // Resize Cesium viewer to fit new container width
+            if (window.tilesetViewer && window.tilesetViewer.viewer) {
+                window.tilesetViewer.viewer.resize();
+            }
+
             jQuery('#end-measurement').trigger('click');
 
             if(window.construktedAssetViewer)
