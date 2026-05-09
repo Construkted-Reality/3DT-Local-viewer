@@ -38,6 +38,19 @@ function initSettingsPopup() {
         scene.requestRender();
     });
 
+    jQuery('#show-bounding-box-checkbox').change(function () {
+        const scene = window.tilesetViewer.viewer.scene;
+
+        for (let i = 0; i < scene.primitives.length; ++i) {
+            const primitive = scene.primitives.get(i);
+
+            if(primitive instanceof Cesium3DTileset)
+                primitive.debugShowBoundingVolume = this.checked;
+        }
+
+        scene.requestRender();
+    });
+
     jQuery('#show-hide-tiles-inspector-checkbox').change(function () {
         showHideTilesInspector(this.checked);
     });
