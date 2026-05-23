@@ -104,6 +104,35 @@ class TilesetViewer {
         this._rightTileset = undefined;
 
         this._buildCompareSlider();
+        this._buildPathLabels();
+    }
+
+    _buildPathLabels() {
+        const left = document.createElement("div");
+        left.className = "tileset-path-label tileset-path-label--left";
+        left.style.display = "none";
+
+        const right = document.createElement("div");
+        right.className = "tileset-path-label tileset-path-label--right";
+        right.style.display = "none";
+
+        this._viewer.container.appendChild(left);
+        this._viewer.container.appendChild(right);
+        this._leftPathLabel = left;
+        this._rightPathLabel = right;
+    }
+
+    _updatePathLabel(slot, displayPath) {
+        const label = slot === "right" ? this._rightPathLabel : this._leftPathLabel;
+        if (!label) return;
+        if (displayPath) {
+            label.textContent = displayPath;
+            label.title = displayPath;
+            label.style.display = "block";
+        } else {
+            label.textContent = "";
+            label.style.display = "none";
+        }
     }
 
     _buildCompareSlider() {
@@ -162,21 +191,22 @@ class TilesetViewer {
         }
     }
 
-    addTileset(tilesetJsonUrl) {
-        this._loadTilesetIntoSlot(tilesetJsonUrl, "left");
+    addTileset(tilesetJsonUrl, displayPath) {
+        this._loadTilesetIntoSlot(tilesetJsonUrl, "left", displayPath);
     }
 
-    addRightTileset(tilesetJsonUrl) {
-        this._loadTilesetIntoSlot(tilesetJsonUrl, "right");
+    addRightTileset(tilesetJsonUrl, displayPath) {
+        this._loadTilesetIntoSlot(tilesetJsonUrl, "right", displayPath);
     }
 
-    _loadTilesetIntoSlot(tilesetJsonUrl, slot) {
+    _loadTilesetIntoSlot(tilesetJsonUrl, slot, displayPath) {
         const viewer = this._viewer;
         const slotKey = slot === "right" ? "_rightTileset" : "_leftTileset";
 
         if (this[slotKey]) {
             viewer.scene.primitives.remove(this[slotKey]);
             this[slotKey] = undefined;
+            this._updatePathLabel(slot, undefined);
         }
 
         Cesium3DTileset.fromUrl(tilesetJsonUrl).then((tileset) => {
@@ -189,6 +219,7 @@ class TilesetViewer {
                 tileset.modelMatrix = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(0, 0));
             }
 
+            this._updatePathLabel(slot, displayPath || tilesetJsonUrl);
             this._updateCompareMode();
             this._onTilesetReady(tileset, slot);
         }).catch((error) => {

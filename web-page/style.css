@@ -38,6 +38,31 @@ body.settings-pane-open #cesiumContainer {
     cursor: ew-resize;
 }
 
+.tileset-path-label {
+    position: absolute;
+    top: 10px;
+    max-width: 45%;
+    padding: 4px 8px;
+    background: rgba(42, 42, 42, 0.7);
+    color: white;
+    font-size: 12px;
+    font-family: monospace;
+    border-radius: 3px;
+    z-index: 9998;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+.tileset-path-label--left {
+    left: 10px;
+}
+
+.tileset-path-label--right {
+    right: 10px;
+}
+
 #menu-bar {
     display: flex;
     justify-content: space-between;

@@ -97,7 +97,10 @@ function loadTilesetForSlot(slot) {
     startServer(slot, port, dir);
 
     const tilesetUrl = `http://localhost:${port}/${baseName}`;
-    mainWindow.webContents.executeJavaScript(`window.tilesetViewer.${method}(${JSON.stringify(tilesetUrl)})`);
+    const displayPath = tilesetPath[0];
+    mainWindow.webContents.executeJavaScript(
+        `window.tilesetViewer.${method}(${JSON.stringify(tilesetUrl)}, ${JSON.stringify(displayPath)})`
+    );
 }
 
 ipcMain.on('select-3d-tile-folder', () => loadTilesetForSlot('left'));
