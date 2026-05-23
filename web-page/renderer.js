@@ -33,6 +33,10 @@ window.addEventListener("DOMContentLoaded", () => {
         window.api.selectTileset();
     });
 
+    document.querySelector('#select-3d-tileset-right').addEventListener('click', () => {
+        window.api.selectRightTileset();
+    });
+
     window.tilesetViewer.tilesetLoadError.addEventListener(() => {
         window.api.notifyTilesetLoadError();
     });

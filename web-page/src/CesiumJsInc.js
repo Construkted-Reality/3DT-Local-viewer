@@ -55,6 +55,7 @@ const PolylineArrowMaterialProperty = Cesium.PolylineArrowMaterialProperty;
 const Quaternion = Cesium.Quaternion;
 const ScreenSpaceEventHandler = Cesium.ScreenSpaceEventHandler;
 const ScreenSpaceEventType = Cesium.ScreenSpaceEventType;
+const SplitDirection = Cesium.SplitDirection;
 const Transforms = Cesium.Transforms;
 const VerticalOrigin = Cesium.VerticalOrigin;
 const Viewer = Cesium.Viewer;
@@ -121,6 +122,7 @@ export {
     Quaternion,
     ScreenSpaceEventHandler,
     ScreenSpaceEventType,
+    SplitDirection,
     Transforms,
     VerticalOrigin,
     Viewer,

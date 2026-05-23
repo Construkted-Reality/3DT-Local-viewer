@@ -5,6 +5,9 @@ import {
     Color,
     Ion,
     KeyboardEventModifier,
+    ScreenSpaceEventHandler,
+    ScreenSpaceEventType,
+    SplitDirection,
     Transforms,
     Viewer,
 } from "./CesiumJsInc.js";
@@ -96,45 +99,110 @@ class TilesetViewer {
 
         this._tilesetLoadError = new Cesium.Event();
         this._tilesetLoaded = new Cesium.Event();
+
+        this._leftTileset = undefined;
+        this._rightTileset = undefined;
+
+        this._buildCompareSlider();
+    }
+
+    _buildCompareSlider() {
+        const slider = document.createElement("div");
+        slider.id = "compare-slider";
+        slider.style.display = "none";
+        this._viewer.container.appendChild(slider);
+        this._slider = slider;
+
+        const handler = new ScreenSpaceEventHandler(slider);
+        let moveActive = false;
+
+        const move = (movement) => {
+            if (!moveActive) return;
+            const relativeOffset = movement.endPosition.x;
+            const splitPosition =
+                (slider.offsetLeft + relativeOffset) / slider.parentElement.offsetWidth;
+            slider.style.left = `${100.0 * splitPosition}%`;
+            this._viewer.scene.splitPosition = splitPosition;
+        };
+
+        handler.setInputAction(() => { moveActive = true; }, ScreenSpaceEventType.LEFT_DOWN);
+        handler.setInputAction(() => { moveActive = true; }, ScreenSpaceEventType.PINCH_START);
+        handler.setInputAction(move, ScreenSpaceEventType.MOUSE_MOVE);
+        handler.setInputAction(move, ScreenSpaceEventType.PINCH_MOVE);
+        handler.setInputAction(() => { moveActive = false; }, ScreenSpaceEventType.LEFT_UP);
+        handler.setInputAction(() => { moveActive = false; }, ScreenSpaceEventType.PINCH_END);
+    }
+
+    _applyPointCloudShadingDefaults(tileset) {
+        tileset.pointCloudShading.attenuation = true;
+        tileset.pointCloudShading.geometricErrorScale = 1.0;
+        tileset.pointCloudShading.maximumAttenuation = undefined;
+        tileset.pointCloudShading.baseResolution = undefined;
+        tileset.pointCloudShading.eyeDomeLighting = true;
+        tileset.pointCloudShading.eyeDomeLightingStrength = 1.0;
+        tileset.pointCloudShading.eyeDomeLightingRadius = 1.0;
+        tileset.pointCloudShading.backFaceCulling = false;
+        tileset.pointCloudShading.normalShading = true;
+    }
+
+    _updateCompareMode() {
+        const bothLoaded = this._leftTileset && this._rightTileset;
+        if (bothLoaded) {
+            this._leftTileset.splitDirection = SplitDirection.LEFT;
+            this._rightTileset.splitDirection = SplitDirection.RIGHT;
+            const slider = this._slider;
+            slider.style.display = "block";
+            slider.style.left = "50%";
+            this._viewer.scene.splitPosition =
+                slider.offsetLeft / slider.parentElement.offsetWidth;
+        } else {
+            if (this._leftTileset) this._leftTileset.splitDirection = SplitDirection.NONE;
+            if (this._rightTileset) this._rightTileset.splitDirection = SplitDirection.NONE;
+            this._slider.style.display = "none";
+        }
     }
 
     addTileset(tilesetJsonUrl) {
-        const viewer = this._viewer;
+        this._loadTilesetIntoSlot(tilesetJsonUrl, "left");
+    }
 
-        if(this._tileset) {
-            viewer.scene.primitives.remove(this._tileset);
-            this._tileset = undefined;
+    addRightTileset(tilesetJsonUrl) {
+        this._loadTilesetIntoSlot(tilesetJsonUrl, "right");
+    }
+
+    _loadTilesetIntoSlot(tilesetJsonUrl, slot) {
+        const viewer = this._viewer;
+        const slotKey = slot === "right" ? "_rightTileset" : "_leftTileset";
+
+        if (this[slotKey]) {
+            viewer.scene.primitives.remove(this[slotKey]);
+            this[slotKey] = undefined;
         }
 
         Cesium3DTileset.fromUrl(tilesetJsonUrl).then((tileset) => {
             viewer.scene.primitives.add(tileset);
-            this._tileset = tileset;
+            this[slotKey] = tileset;
 
-            tileset.pointCloudShading.attenuation = true;
-            tileset.pointCloudShading.geometricErrorScale = 1.0;
-            tileset.pointCloudShading.maximumAttenuation = undefined; // uses the tile's geometric error
-            tileset.pointCloudShading.baseResolution = undefined;     // computed from geometric error
-            tileset.pointCloudShading.eyeDomeLighting = true;
-            tileset.pointCloudShading.eyeDomeLightingStrength = 1.0;
-            tileset.pointCloudShading.eyeDomeLightingRadius = 1.0;
-            tileset.pointCloudShading.backFaceCulling = false;
-            tileset.pointCloudShading.normalShading = true;
+            this._applyPointCloudShadingDefaults(tileset);
 
             if (!geoReferenced(tileset)) {
                 tileset.modelMatrix = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(0, 0));
             }
 
-            this._onTilesetReady(tileset);
+            this._updateCompareMode();
+            this._onTilesetReady(tileset, slot);
         }).catch((error) => {
             this._tilesetLoadError.raiseEvent(error);
             console.error(error);
         });
     }
 
-    _onTilesetReady(tileset) {
+    _onTilesetReady(tileset, slot) {
         const viewer = this._viewer;
 
-        viewer.zoomTo(tileset);
+        if (slot === "left") {
+            viewer.zoomTo(tileset);
+        }
         this._tilesetLoaded.raiseEvent(tileset);
     }
 

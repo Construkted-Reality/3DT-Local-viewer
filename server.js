@@ -4,9 +4,14 @@
 
 "use strict";
 
-let server;
+const servers = {};
 
-function startServer(port, dir) {
+function startServer(id, port, dir) {
+    if (servers[id]) {
+        servers[id].close();
+        delete servers[id];
+    }
+
     const express = require("express");
     const compression = require("compression");
     const fs = require("fs");
@@ -81,7 +86,7 @@ function startServer(port, dir) {
 
     app.use(express.static(dir));
 
-    server = app.listen(
+    const server = app.listen(
         port,
         "localhost",
         function () {
@@ -91,6 +96,7 @@ function startServer(port, dir) {
             );
         }
     );
+    servers[id] = server;
 
     server.on("error", function (e) {
         if (e.code === "EADDRINUSE") {
@@ -131,9 +137,11 @@ function startServer(port, dir) {
     });
 }
 
-function stopServer() {
-    if(server)
-        server.close();
+function stopServer(id) {
+    if (servers[id]) {
+        servers[id].close();
+        delete servers[id];
+    }
 }
 
 module.exports = {

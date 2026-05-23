@@ -78,11 +78,11 @@ ipcMain.handle('window-is-maximized', () => {
     return mainWindow ? mainWindow.isMaximized() : false;
 });
 
-ipcMain.on('select-3d-tile-folder', () => {
+function loadTilesetForSlot(slot) {
     if (!mainWindow) return;
 
     const tilesetPath = dialog.showOpenDialogSync(mainWindow, {
-        title: 'Select a tileset json file',
+        title: `Select tileset JSON for the ${slot} side`,
         properties: ['openFile'],
     });
 
@@ -90,14 +90,18 @@ ipcMain.on('select-3d-tile-folder', () => {
 
     const dir = path.dirname(tilesetPath[0]);
     const baseName = path.basename(tilesetPath[0]);
-    const port = 3000;
+    const port = slot === 'right' ? 3001 : 3000;
+    const method = slot === 'right' ? 'addRightTileset' : 'addTileset';
 
-    stopServer();
-    startServer(port, dir);
+    stopServer(slot);
+    startServer(slot, port, dir);
 
     const tilesetUrl = `http://localhost:${port}/${baseName}`;
-    mainWindow.webContents.executeJavaScript(`window.tilesetViewer.addTileset(${JSON.stringify(tilesetUrl)})`);
-});
+    mainWindow.webContents.executeJavaScript(`window.tilesetViewer.${method}(${JSON.stringify(tilesetUrl)})`);
+}
+
+ipcMain.on('select-3d-tile-folder', () => loadTilesetForSlot('left'));
+ipcMain.on('select-3d-tile-folder-right', () => loadTilesetForSlot('right'));
 
 ipcMain.on('tileset-load-error', () => {
     dialog.showMessageBoxSync({

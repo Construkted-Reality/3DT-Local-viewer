@@ -22,5 +22,6 @@ contextBridge.exposeInMainWorld("api", {
     closeWindow: () => ipcRenderer.send("window-close"),
     isWindowMaximized: () => ipcRenderer.invoke("window-is-maximized"),
     selectTileset: () => ipcRenderer.send("select-3d-tile-folder"),
+    selectRightTileset: () => ipcRenderer.send("select-3d-tile-folder-right"),
     notifyTilesetLoadError: () => ipcRenderer.send("tileset-load-error"),
 });
