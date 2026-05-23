@@ -102,37 +102,70 @@ class TilesetViewer {
 
         this._leftTileset = undefined;
         this._rightTileset = undefined;
+        this._slotMeta = { left: undefined, right: undefined };
+        this._benchmarkRunning = false;
 
         this._buildCompareSlider();
-        this._buildPathLabels();
+        this._buildStatsPanels();
     }
 
-    _buildPathLabels() {
-        const left = document.createElement("div");
-        left.className = "tileset-path-label tileset-path-label--left";
-        left.style.display = "none";
+    _buildStatsPanels() {
+        const container = document.createElement("div");
+        container.id = "statsContainer";
 
-        const right = document.createElement("div");
-        right.className = "tileset-path-label tileset-path-label--right";
-        right.style.display = "none";
+        const paneHtml = (slot) => `
+            <div id="${slot}StatsPane" class="statsPane panel" style="display:none;">
+                <div class="statsTitle" data-stats="${slot}Title">---</div>
+                <div class="statsBody">
+                    Tiles Loaded: <span data-stats="${slot}TilesLoaded">---</span> /
+                    <span data-stats="${slot}TilesTotal">---</span>
+                    <br />
+                    GPU Memory: <span data-stats="${slot}GpuMemoryMB">---</span> MB
+                    <div class="benchmarkNotice" data-stats="${slot}BenchmarkNotice"></div>
+                    Tile Load Time (s): <span data-stats="${slot}TileLoadTime">---</span>
+                </div>
+            </div>`;
+        container.innerHTML = paneHtml("left") + paneHtml("right");
 
-        this._viewer.container.appendChild(left);
-        this._viewer.container.appendChild(right);
-        this._leftPathLabel = left;
-        this._rightPathLabel = right;
+        this._viewer.container.appendChild(container);
+
+        const find = (key) => container.querySelector(`[data-stats="${key}"]`);
+        const paneFor = (slot) => ({
+            pane: container.querySelector(`#${slot}StatsPane`),
+            title: find(`${slot}Title`),
+            tilesLoaded: find(`${slot}TilesLoaded`),
+            tilesTotal: find(`${slot}TilesTotal`),
+            gpuMemoryMB: find(`${slot}GpuMemoryMB`),
+            benchmarkNotice: find(`${slot}BenchmarkNotice`),
+            tileLoadTime: find(`${slot}TileLoadTime`),
+        });
+        this._statsEls = { left: paneFor("left"), right: paneFor("right") };
     }
 
-    _updatePathLabel(slot, displayPath) {
-        const label = slot === "right" ? this._rightPathLabel : this._leftPathLabel;
-        if (!label) return;
-        if (displayPath) {
-            label.textContent = displayPath;
-            label.title = displayPath;
-            label.style.display = "block";
-        } else {
-            label.textContent = "";
-            label.style.display = "none";
-        }
+    _showStatsPane(slot, folderName) {
+        const els = this._statsEls[slot];
+        els.title.textContent = folderName || "(unnamed)";
+        els.title.title = folderName || "";
+        els.tilesLoaded.textContent = "---";
+        els.tilesTotal.textContent = "---";
+        els.gpuMemoryMB.textContent = "---";
+        els.tileLoadTime.textContent = "---";
+        els.benchmarkNotice.textContent = "Press 'Compute time to load' to measure load time";
+        els.pane.style.display = "block";
+    }
+
+    _hideStatsPane(slot) {
+        const els = this._statsEls[slot];
+        els.pane.style.display = "none";
+    }
+
+    _updateStats(slot, tileset) {
+        const els = this._statsEls[slot];
+        const stats = tileset.statistics;
+        els.tilesLoaded.textContent = stats.numberOfLoadedTilesTotal;
+        els.tilesTotal.textContent = stats.numberOfTilesTotal;
+        const gpuBytes = stats.geometryByteLength + stats.texturesByteLength;
+        els.gpuMemoryMB.textContent = (gpuBytes / 1024 / 1024).toPrecision(3);
     }
 
     _buildCompareSlider() {
@@ -191,47 +224,93 @@ class TilesetViewer {
         }
     }
 
-    addTileset(tilesetJsonUrl, displayPath) {
-        this._loadTilesetIntoSlot(tilesetJsonUrl, "left", displayPath);
+    addTileset(tilesetJsonUrl, folderName) {
+        this._loadTilesetIntoSlot(tilesetJsonUrl, "left", folderName);
     }
 
-    addRightTileset(tilesetJsonUrl, displayPath) {
-        this._loadTilesetIntoSlot(tilesetJsonUrl, "right", displayPath);
+    addRightTileset(tilesetJsonUrl, folderName) {
+        this._loadTilesetIntoSlot(tilesetJsonUrl, "right", folderName);
     }
 
-    _loadTilesetIntoSlot(tilesetJsonUrl, slot, displayPath) {
+    _loadTilesetIntoSlot(tilesetJsonUrl, slot, folderName, options = {}) {
         const viewer = this._viewer;
         const slotKey = slot === "right" ? "_rightTileset" : "_leftTileset";
 
         if (this[slotKey]) {
             viewer.scene.primitives.remove(this[slotKey]);
             this[slotKey] = undefined;
-            this._updatePathLabel(slot, undefined);
+            this._hideStatsPane(slot);
         }
+        this._slotMeta[slot] = { url: tilesetJsonUrl, folderName };
 
-        Cesium3DTileset.fromUrl(tilesetJsonUrl).then((tileset) => {
-            viewer.scene.primitives.add(tileset);
-            this[slotKey] = tileset;
+        return new Promise((resolve, reject) => {
+            Cesium3DTileset.fromUrl(tilesetJsonUrl).then((tileset) => {
+                viewer.scene.primitives.add(tileset);
+                this[slotKey] = tileset;
 
-            this._applyPointCloudShadingDefaults(tileset);
+                this._applyPointCloudShadingDefaults(tileset);
 
-            if (!geoReferenced(tileset)) {
-                tileset.modelMatrix = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(0, 0));
-            }
+                if (!geoReferenced(tileset)) {
+                    tileset.modelMatrix = Transforms.eastNorthUpToFixedFrame(Cartesian3.fromDegrees(0, 0));
+                }
 
-            this._updatePathLabel(slot, displayPath || tilesetJsonUrl);
-            this._updateCompareMode();
-            this._onTilesetReady(tileset, slot);
-        }).catch((error) => {
-            this._tilesetLoadError.raiseEvent(error);
-            console.error(error);
+                this._showStatsPane(slot, folderName);
+                const onTileChange = () => this._updateStats(slot, tileset);
+                tileset.tileLoad.addEventListener(onTileChange);
+                tileset.tileUnload.addEventListener(onTileChange);
+                this._updateStats(slot, tileset);
+
+                this._updateCompareMode();
+                this._onTilesetReady(tileset, slot, options);
+
+                const onInitial = () => {
+                    tileset.initialTilesLoaded.removeEventListener(onInitial);
+                    resolve(tileset);
+                };
+                tileset.initialTilesLoaded.addEventListener(onInitial);
+            }).catch((error) => {
+                this._tilesetLoadError.raiseEvent(error);
+                console.error(error);
+                reject(error);
+            });
         });
     }
 
-    _onTilesetReady(tileset, slot) {
+    async computeLoadTimes() {
+        if (this._benchmarkRunning) return;
+        this._benchmarkRunning = true;
+        try {
+            if (this._slotMeta.left) await this._benchmarkSlot("left");
+            if (this._slotMeta.right) await this._benchmarkSlot("right");
+        } finally {
+            this._benchmarkRunning = false;
+        }
+    }
+
+    async _benchmarkSlot(slot) {
+        const meta = this._slotMeta[slot];
+        if (!meta) return;
+        const els = this._statsEls[slot];
+        els.tileLoadTime.textContent = "---";
+        els.benchmarkNotice.textContent = "";
+
+        const startMs = performance.now();
+        try {
+            await this._loadTilesetIntoSlot(meta.url, slot, meta.folderName, { suppressZoom: true });
+        } catch (e) {
+            return;
+        }
+        const elapsedSec = (performance.now() - startMs) / 1000.0;
+        // _loadTilesetIntoSlot calls _showStatsPane which resets the notice.
+        // Clear it again and write the measured time.
+        els.benchmarkNotice.textContent = "";
+        els.tileLoadTime.textContent = elapsedSec.toPrecision(3);
+    }
+
+    _onTilesetReady(tileset, slot, options = {}) {
         const viewer = this._viewer;
 
-        if (slot === "left") {
+        if (slot === "left" && !options.suppressZoom) {
             viewer.zoomTo(tileset);
         }
         this._tilesetLoaded.raiseEvent(tileset);

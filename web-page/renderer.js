@@ -37,6 +37,10 @@ window.addEventListener("DOMContentLoaded", () => {
         window.api.selectRightTileset();
     });
 
+    document.querySelector('#compute-load-times').addEventListener('click', () => {
+        window.tilesetViewer.computeLoadTimes();
+    });
+
     window.tilesetViewer.tilesetLoadError.addEventListener(() => {
         window.api.notifyTilesetLoadError();
     });

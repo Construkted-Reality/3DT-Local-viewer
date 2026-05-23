@@ -97,9 +97,9 @@ function loadTilesetForSlot(slot) {
     startServer(slot, port, dir);
 
     const tilesetUrl = `http://localhost:${port}/${baseName}`;
-    const displayPath = tilesetPath[0];
+    const folderName = path.basename(dir);
     mainWindow.webContents.executeJavaScript(
-        `window.tilesetViewer.${method}(${JSON.stringify(tilesetUrl)}, ${JSON.stringify(displayPath)})`
+        `window.tilesetViewer.${method}(${JSON.stringify(tilesetUrl)}, ${JSON.stringify(folderName)})`
     );
 }
 
