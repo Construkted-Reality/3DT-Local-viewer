@@ -83,6 +83,11 @@ body.settings-pane-open #cesiumContainer {
     min-height: 1em;
 }
 
+.cesium-viewer-cesium3DTilesInspectorContainer {
+    top: 35px;
+    right: 55px;
+}
+
 #menu-bar {
     display: flex;
     justify-content: space-between;

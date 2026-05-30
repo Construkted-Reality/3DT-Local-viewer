@@ -87,6 +87,8 @@ A full make on a single platform takes roughly 5–30 minutes depending on host.
 
 The previous Windows-only restriction on the file picker has been removed; the viewer now opens tilesets on Linux, macOS, and Windows.
 
+Open **Settings** (the gear icon in the right-hand Tools sidebar) and enable **Show 3D Tiles Inspector** to display the CesiumJS 3D Tiles Inspector widget (hidden by default). In side-by-side comparison mode, the inspector's display and debug settings are applied to both the left and right tilesets simultaneously.
+
 ## Release process
 
 1. Bump `version` in `package.json`.

@@ -52,7 +52,7 @@ function initSettingsPopup() {
     });
 
     jQuery('#show-hide-tiles-inspector-checkbox').change(function () {
-        showHideTilesInspector(this.checked);
+        window.tilesetViewer.setInspectorVisible(this.checked);
     });
 
     const jQFxaaEnableCheckBox = jQuery('#fxaa-enable-checkbox');
