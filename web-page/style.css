@@ -86,6 +86,7 @@ body.settings-pane-open #cesiumContainer {
 .cesium-viewer-cesium3DTilesInspectorContainer {
     top: 35px;
     right: 55px;
+    z-index: 10000;
 }
 
 #menu-bar {
