@@ -5,4 +5,9 @@ out/
 /web-page/node_modules
 /web-page/app.js
 /web-page/app.js.map
+/web-page/build/
 /web-page/yarn.lock
+
+# Local sample tileset data
+/postfix-hp/
+/prefix-hp/
