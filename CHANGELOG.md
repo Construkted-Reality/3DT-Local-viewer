@@ -1,5 +1,16 @@
 # Change Log
 
+### 1.3.0 - 2026-05-31
+
+#### Added
+
+- Per-side stats panels showing tiles loaded, GPU memory, and a "Compute time to load" benchmark for each compare side.
+- CesiumJS 3D Tiles Inspector (hidden by default), enabled via Settings. In side-by-side comparison mode its display and debug settings are mirrored to both the left and right tilesets.
+
+#### Changed
+
+- 3D Tiles Inspector "Enable Picking" now starts unchecked (picking off by default).
+
 ### 1.2.0 - 2026-04-25
 
 #### Changed
