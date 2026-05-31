@@ -2,10 +2,11 @@ import {Cesium3DTileset} from "./CesiumJsInc.js";
 
 function initSettingsPopup() {
     const sseSlider = jQuery('#maximum-screen-space-error-slider');
+    const sseValueInput = jQuery('#maximum-screen-space-error-value');
 
-    sseSlider.on('input change', function () {
+    function applyScreenSpaceError(sliderValue) {
         const scene = window.tilesetViewer.viewer.scene;
-        const sse = Math.max(1, 32 - parseFloat(this.value));
+        const sse = Math.max(1, 32 - parseFloat(sliderValue));
 
         for (let i = 0; i < scene.primitives.length; ++i) {
             const primitive = scene.primitives.get(i);
@@ -15,10 +16,34 @@ function initSettingsPopup() {
         }
 
         scene.requestRender();
+    }
+
+    sseSlider.on('input change', function () {
+        sseValueInput.val(this.value);
+        applyScreenSpaceError(this.value);
+    });
+
+    // The number input commits on Enter or when focus leaves (Tab), both of
+    // which fire a 'change' event. Clamp to the slider's range before applying.
+    sseValueInput.on('change', function () {
+        const min = parseFloat(this.min);
+        const max = parseFloat(this.max);
+        let value = parseFloat(this.value);
+
+        if (isNaN(value))
+            value = parseFloat(sseSlider.val());
+
+        value = Math.min(max, Math.max(min, value));
+
+        this.value = value;
+        sseSlider.val(value);
+        applyScreenSpaceError(value);
     });
 
     window.tilesetViewer.tilesetLoaded.addEventListener((tileset) => {
-        sseSlider.val(32 - tileset.maximumScreenSpaceError);
+        const sliderValue = 32 - tileset.maximumScreenSpaceError;
+        sseSlider.val(sliderValue);
+        sseValueInput.val(sliderValue);
     });
 
     jQuery('#fpv-movement-speed-slider').change(function () {

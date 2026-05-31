@@ -345,6 +345,24 @@ popups
     }
 }
 
+.slider-with-input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.slider-with-input .form-control-range {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.slider-value-input {
+    flex: 0 0 auto;
+    width: 56px;
+    padding: 2px 4px;
+    text-align: center;
+}
+
 .close-btn {
     color: lightgray;
     font-size: 24px;

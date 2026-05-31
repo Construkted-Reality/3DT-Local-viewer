@@ -76,8 +76,12 @@
                             <div class="form-group">
                                 <label for="display_performance"><strong>Display</strong></label>
                                 <br>Rendering performance
-                                <input type="range" id="maximum-screen-space-error-slider" class="form-control-range"
-                                       name="display_performance" min="2" max="31" value="16">
+                                <div class="slider-with-input">
+                                    <input type="range" id="maximum-screen-space-error-slider" class="form-control-range"
+                                           name="display_performance" min="2" max="31" value="16">
+                                    <input type="number" id="maximum-screen-space-error-value"
+                                           class="slider-value-input" min="2" max="31" step="1" value="16">
+                                </div>
                                 <div class="label-min-max">
                                     <span class="lbl-min">Performance</span>
                                     <span class="lbl-max" style="float:right">Quality</span>
