@@ -10,11 +10,13 @@ import {
     SplitDirection,
     Transforms,
     Viewer,
+    viewerCesium3DTilesInspectorMixin,
 } from "./CesiumJsInc.js";
 
 import {geoReferenced} from "./util";
 import {CesiumFLYCameraController} from "./CesiumFLYCameraController";
 import {NavigationControlbar} from "./NavigationControlbar"
+import {mirrorTilesetSettings} from "./mirrorTilesetSettings";
 
 class TilesetViewer {
     constructor() {
@@ -107,6 +109,29 @@ class TilesetViewer {
 
         this._buildCompareSlider();
         this._buildStatsPanels();
+        this._buildTilesInspector();
+    }
+
+    _buildTilesInspector() {
+        this._viewer.extend(viewerCesium3DTilesInspectorMixin);
+        this._inspector = this._viewer.cesium3DTilesInspector;
+        this._inspector.container.style.display = "none";
+
+        // Picking is on by default in the Cesium inspector; start it off.
+        this._inspector.viewModel.picking = false;
+
+        // The inspector edits a single tileset. Mirror its settings onto the
+        // other compare side every frame so both views stay in sync.
+        this._viewer.scene.preUpdate.addEventListener(() => {
+            const source = this._inspector.viewModel.tileset;
+            if (!source) return;
+            const other = source === this._leftTileset ? this._rightTileset : this._leftTileset;
+            mirrorTilesetSettings(source, other);
+        });
+    }
+
+    setInspectorVisible(visible) {
+        this._inspector.container.style.display = visible ? "block" : "none";
     }
 
     _buildStatsPanels() {
@@ -236,6 +261,8 @@ class TilesetViewer {
         const viewer = this._viewer;
         const slotKey = slot === "right" ? "_rightTileset" : "_leftTileset";
 
+        const wasInspectorTarget = this._inspector.viewModel.tileset === this[slotKey];
+
         if (this[slotKey]) {
             viewer.scene.primitives.remove(this[slotKey]);
             this[slotKey] = undefined;
@@ -247,6 +274,10 @@ class TilesetViewer {
             Cesium3DTileset.fromUrl(tilesetJsonUrl).then((tileset) => {
                 viewer.scene.primitives.add(tileset);
                 this[slotKey] = tileset;
+
+                if (wasInspectorTarget || !this._inspector.viewModel.tileset) {
+                    this._inspector.viewModel.tileset = tileset;
+                }
 
                 this._applyPointCloudShadingDefaults(tileset);
 
