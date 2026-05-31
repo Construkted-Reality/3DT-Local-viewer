@@ -40,10 +40,52 @@ function initSettingsPopup() {
         applyScreenSpaceError(value);
     });
 
+    const skipLodCheckbox = jQuery('#skip-level-of-detail-checkbox');
+    const cacheMemoryInput = jQuery('#tile-cache-memory-value');
+
+    skipLodCheckbox.change(function () {
+        const scene = window.tilesetViewer.viewer.scene;
+
+        for (let i = 0; i < scene.primitives.length; ++i) {
+            const primitive = scene.primitives.get(i);
+
+            if(primitive instanceof Cesium3DTileset)
+                primitive.skipLevelOfDetail = this.checked;
+        }
+
+        scene.requestRender();
+    });
+
+    // Number input commits on Enter or blur (both fire 'change'). The value is
+    // in MB; Cesium's cacheBytes is in bytes. Clamp to the input's minimum.
+    cacheMemoryInput.on('change', function () {
+        const min = parseFloat(this.min);
+        let megabytes = parseFloat(this.value);
+
+        if (isNaN(megabytes) || megabytes < min)
+            megabytes = min;
+
+        this.value = megabytes;
+
+        const scene = window.tilesetViewer.viewer.scene;
+        const bytes = megabytes * 1024 * 1024;
+
+        for (let i = 0; i < scene.primitives.length; ++i) {
+            const primitive = scene.primitives.get(i);
+
+            if(primitive instanceof Cesium3DTileset)
+                primitive.cacheBytes = bytes;
+        }
+
+        scene.requestRender();
+    });
+
     window.tilesetViewer.tilesetLoaded.addEventListener((tileset) => {
         const sliderValue = 32 - tileset.maximumScreenSpaceError;
         sseSlider.val(sliderValue);
         sseValueInput.val(sliderValue);
+        skipLodCheckbox.prop('checked', tileset.skipLevelOfDetail);
+        cacheMemoryInput.val(Math.round(tileset.cacheBytes / 1024 / 1024));
     });
 
     jQuery('#fpv-movement-speed-slider').change(function () {

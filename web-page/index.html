@@ -131,10 +131,24 @@
                             </div>
 
                             <div class="form-check">
+                                <input class="form-check-input" id="skip-level-of-detail-checkbox" type="checkbox">
+                                <label class="form-check-label" for="skip-level-of-detail-checkbox">
+                                    Skip Level of Detail
+                                </label>
+                            </div>
+
+                            <div class="form-check">
                                 <input class="form-check-input" id="show-hide-tiles-inspector-checkbox" type="checkbox">
                                 <label class="form-check-label" for="show-hide-tiles-inspector-checkbox">
                                     Show 3D Tiles Inspector
                                 </label>
+                            </div>
+
+                            <div class="form-group" style="margin-top:0.75rem">
+                                <label for="tile-cache-memory-value">GPU Tile Cache (MB)</label>
+                                <input type="number" id="tile-cache-memory-value"
+                                       class="slider-value-input" style="width:80px" min="64" step="64" value="512">
+                                <p class="desc">Max GPU memory for cached tiles. Raise it if detailed tiles degrade as more load.</p>
                             </div>
                         </div>
                     </div>

@@ -27,6 +27,7 @@ const TILESET_PROPERTIES = [
     "immediatelyLoadDesiredLevelOfDetail",
     "loadSiblings",
     "cullWithChildrenBounds",
+    "cacheBytes",
 ];
 
 // Nested pointCloudShading properties the inspector controls.
