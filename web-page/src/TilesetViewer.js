@@ -117,6 +117,9 @@ class TilesetViewer {
         this._inspector = this._viewer.cesium3DTilesInspector;
         this._inspector.container.style.display = "none";
 
+        // Picking is on by default in the Cesium inspector; start it off.
+        this._inspector.viewModel.picking = false;
+
         // The inspector edits a single tileset. Mirror its settings onto the
         // other compare side every frame so both views stay in sync.
         this._viewer.scene.preUpdate.addEventListener(() => {
