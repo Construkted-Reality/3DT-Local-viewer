@@ -1,5 +1,13 @@
 # Change Log
 
+### 1.4.0 - 2026-05-31
+
+#### Added
+
+- Settings: editable number input next to the rendering-performance slider for typing an exact screen-space-error value.
+- Settings: "Skip Level of Detail" toggle, exposing the CesiumJS `skipLevelOfDetail` knob to trade smoother refinement for lower peak memory.
+- Settings: "GPU Tile Cache (MB)" input that sets each tileset's `cacheBytes`, raising the cache budget above the default ~1 GB cap so detailed tiles stop degrading as more load. In compare mode the cache size is mirrored across both sides.
+
 ### 1.3.0 - 2026-05-31
 
 #### Added
