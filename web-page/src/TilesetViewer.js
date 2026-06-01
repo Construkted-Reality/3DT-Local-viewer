@@ -329,6 +329,8 @@ class TilesetViewer {
         try {
             await this._loadTilesetIntoSlot(meta.url, slot, meta.folderName, { suppressZoom: true });
         } catch (e) {
+            console.error("benchmark reload failed for", slot, e);
+            els.benchmarkNotice.textContent = "Reload failed; could not measure load time.";
             return;
         }
         const elapsedSec = (performance.now() - startMs) / 1000.0;
