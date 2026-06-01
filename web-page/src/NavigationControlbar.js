@@ -61,7 +61,7 @@ function newButton(text,iconClass) {
     }
 
     button.type = "button";
-    button.innerHTML = icon.outerHTML + text;
+    button.innerHTML = (icon ? icon.outerHTML : '') + text;
     button.className = "construkted-viewer-controlbar-button";
 
     return button;
