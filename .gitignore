@@ -11,3 +11,6 @@ out/
 # Local sample tileset data
 /postfix-hp/
 /prefix-hp/
+
+# Large raw profiler traces (regenerate via tools/profile-harness.js); summary.json is kept
+/tools/traces/trace-*.json
