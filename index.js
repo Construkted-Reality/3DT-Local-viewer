@@ -16,13 +16,23 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            sandbox: false,
+            sandbox: true,
             preload: path.join(__dirname, 'preload.js')
         },
         frame: false
     });
 
     mainWindow.loadFile('./web-page/index.html');
+
+    // The app only ever displays its own bundled local page; block any attempt
+    // to navigate this privileged window elsewhere or spawn child windows.
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (url !== mainWindow.webContents.getURL()) {
+            event.preventDefault();
+        }
+    });
+
+    mainWindow.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
 
     mainWindow.webContents.on('console-message', (event) => {
         const levels = ['LOG', 'WARN', 'ERROR'];
