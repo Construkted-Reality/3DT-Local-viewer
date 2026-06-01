@@ -32,7 +32,9 @@ function startServer(id, port, dir) {
     const compression = require("compression");
     const fs = require("fs");
     const url = require("url");
+    const path = require("path");
     const gzipHeader = Buffer.from("1F8B08", "hex");
+    const rootDir = path.resolve(dir);
 
     // eventually this mime type configuration will need to change
     // https://github.com/visionmedia/send/commit/d2cb54658ce65948b0ed6e5fb5de69d022bef941
@@ -71,19 +73,49 @@ function startServer(id, port, dir) {
     });
 
     function checkGzipAndNext(req, res, next) {
-        const reqUrl = url.parse(req.url, true);
-        const filePath = reqUrl.pathname.substring(1);
-
-        const readStream = fs.createReadStream(filePath, { start: 0, end: 2 });
-        readStream.on("error", function (err) {
+        // Guard against next() being called more than once (data + end, or
+        // error after data) which would corrupt the middleware chain.
+        let advanced = false;
+        function advance() {
+            if (advanced) return;
+            advanced = true;
             next();
+        }
+
+        const reqUrl = url.parse(req.url, true);
+
+        // Resolve against the served directory, not the process cwd, and refuse
+        // anything that escapes it. The previous code read relative to cwd, so
+        // gzip detection never worked for the normal case (tileset dir !== cwd)
+        // and pre-gzipped tilesets were served as raw gzip Cesium could not parse.
+        let pathname;
+        try {
+            pathname = decodeURIComponent(reqUrl.pathname);
+        } catch (e) {
+            return advance();
+        }
+        const resolved = path.resolve(rootDir, "." + pathname);
+        if (resolved !== rootDir && !resolved.startsWith(rootDir + path.sep)) {
+            return advance();
+        }
+
+        const readStream = fs.createReadStream(resolved, { start: 0, end: 2 });
+        readStream.on("error", function (err) {
+            console.error("gzip sniff failed for", resolved, err.code || err.message);
+            advance();
         });
 
         readStream.on("data", function (chunk) {
             if (chunk.equals(gzipHeader)) {
                 res.header("Content-Encoding", "gzip");
             }
-            next();
+            advance();
+        });
+
+        // A zero-byte file emits 'end' with no 'data'/'error'; without this the
+        // request would hang until the client times out.
+        readStream.on("end", function () {
+            advance();
         });
     }
 
