@@ -75,6 +75,9 @@ class CesiumFLYCameraController extends CesiumCameraController{
 
             let moveRate = defaultFLYSpeed * this._moveRateFactor * this.speed;
 
+            const moving = flags.moveForward || flags.moveBackward || flags.moveUp ||
+                flags.moveDown || flags.moveLeft || flags.moveRight;
+
             if (flags.moveForward) {
                 camera.moveForward(moveRate);
             }
@@ -92,6 +95,12 @@ class CesiumFLYCameraController extends CesiumCameraController{
             }
             if (flags.moveRight) {
                 camera.moveRight(moveRate);
+            }
+
+            // Under requestRenderMode the clock tick alone does not render;
+            // moving the camera here must explicitly request a frame.
+            if (moving) {
+                viewer.scene.requestRender();
             }
         });
     }

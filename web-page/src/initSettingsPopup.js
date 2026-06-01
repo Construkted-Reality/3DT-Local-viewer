@@ -132,6 +132,7 @@ function initSettingsPopup() {
         const viewer = window.tilesetViewer.viewer;
 
         viewer.scene.postProcessStages.fxaa.enabled = this.checked;
+        viewer.scene.requestRender();
     });
 }
 

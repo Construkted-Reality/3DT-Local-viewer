@@ -32,6 +32,16 @@ class TilesetViewer {
             geocoder: false,
             sceneModePicker: false,
             timeline: false,
+
+            // Explicit-render mode: the scene only re-renders when something
+            // requests it (camera moves, tiles stream in, a setting changes),
+            // instead of every vsync. Idle GPU/CPU drops to near zero. Every
+            // custom interaction path must call scene.requestRender() — see the
+            // fly controller, the heading/pitch drag, the compare slider and
+            // the settings handlers. maximumRenderTimeChange:Infinity keeps the
+            // (non-animated) clock from forcing renders on its own.
+            requestRenderMode: true,
+            maximumRenderTimeChange: Infinity,
         });
 
         this._viewer = viewer;
@@ -209,6 +219,7 @@ class TilesetViewer {
                 (slider.offsetLeft + relativeOffset) / slider.parentElement.offsetWidth;
             slider.style.left = `${100.0 * splitPosition}%`;
             this._viewer.scene.splitPosition = splitPosition;
+            this._viewer.scene.requestRender();
         };
 
         handler.setInputAction(() => { moveActive = true; }, ScreenSpaceEventType.LEFT_DOWN);

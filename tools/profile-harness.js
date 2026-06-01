@@ -129,23 +129,41 @@ async function measureCreditPatchCost(wc, iterations) {
     })()`);
 }
 
-// Decisive before/after for the requestRenderMode umbrella: toggle it at runtime
-// and re-measure the idle render frequency.
-async function measureRequestRenderMode(wc, ms) {
-    await wc.executeJavaScript(`(() => {
-        const scene = window.tilesetViewer.viewer.scene;
-        scene.requestRenderMode = true;
-        scene.maximumRenderTimeChange = Infinity;
-        scene.requestRender();
-        return true;
-    })()`);
-    await sleep(500);
-    const after = await measureIdle(wc, ms);
-    await wc.executeJavaScript(`(() => {
-        window.tilesetViewer.viewer.scene.requestRenderMode = false;
-        return true;
-    })()`);
-    return after;
+// Verify the interaction paths still render under requestRenderMode: a path that
+// fails to call requestRender() would visibly freeze. Drives a real W keypress
+// (fly movement) and a left-drag rotate (custom heading/pitch) via CDP.
+async function verifyInteractions(wc, win) {
+    const dbg = wc.debugger;
+    if (!dbg.isAttached()) dbg.attach("1.3");
+    win.focus();
+
+    await wc.executeJavaScript(`window.tilesetViewer.flyController.start(); true`);
+    const flyIdle = await measureIdle(wc, 1200);
+
+    // Hold W: each clock tick should requestRender while a key is down.
+    await dbg.sendCommand("Input.dispatchKeyEvent", {type: "keyDown", windowsVirtualKeyCode: 87, nativeVirtualKeyCode: 87, key: "w", code: "KeyW"});
+    const wHeld = await measureIdle(wc, 1200);
+    await dbg.sendCommand("Input.dispatchKeyEvent", {type: "keyUp", windowsVirtualKeyCode: 87, nativeVirtualKeyCode: 87, key: "w", code: "KeyW"});
+    const wReleased = await measureIdle(wc, 1200);
+
+    // Left-drag to rotate (custom heading/pitch handler -> camera.setView).
+    const cx = 640, cy = 400;
+    await dbg.sendCommand("Input.dispatchMouseEvent", {type: "mousePressed", x: cx, y: cy, button: "left", buttons: 1, clickCount: 1});
+    const dragStart = await wc.executeJavaScript(`(()=>{const s=window.tilesetViewer.viewer.scene;window.__d=0;window.__dh=()=>window.__d++;s.postRender.addEventListener(window.__dh);return true;})()`);
+    for (let i = 1; i <= 20; i++) {
+        await dbg.sendCommand("Input.dispatchMouseEvent", {type: "mouseMoved", x: cx + i * 4, y: cy + i, button: "left", buttons: 1});
+        await sleep(20);
+    }
+    const dragRenders = await wc.executeJavaScript(`(()=>{const s=window.tilesetViewer.viewer.scene;s.postRender.removeEventListener(window.__dh);return window.__d;})()`);
+    await dbg.sendCommand("Input.dispatchMouseEvent", {type: "mouseReleased", x: cx + 80, y: cy + 20, button: "left", buttons: 0, clickCount: 1});
+
+    await wc.executeJavaScript(`window.tilesetViewer.flyController.stop(); true`);
+    return {
+        flyIdle_rps: flyIdle.rendersPerSec,
+        wHeld_rps: wHeld.rendersPerSec,
+        wReleased_rps: wReleased.rendersPerSec,
+        rotateDrag_renders: dragRenders,
+    };
 }
 
 // L-P1: mirror cost per frame in compare mode (both slots loaded).
@@ -222,10 +240,10 @@ app.whenReady().then(async () => {
         summary.creditPatch = await measureCreditPatchCost(wc, 2000);
         log("  ", JSON.stringify(summary.creditPatch));
 
-        // --- Phase 4: requestRenderMode ON, re-measure idle (umbrella) ---
-        log("phase 4: requestRenderMode ON");
-        summary.idleRequestRenderMode = await measureRequestRenderMode(wc, IDLE_MS);
-        log("  ", JSON.stringify(summary.idleRequestRenderMode));
+        // --- Phase 4: verify interaction paths still render (no freeze) ---
+        log("phase 4: interaction verification (fly W, rotate drag)");
+        summary.interactions = await verifyInteractions(wc, win);
+        log("  ", JSON.stringify(summary.interactions));
 
         // --- Phase 5: compare mode -> mirror cost (L-P1) ---
         log("phase 5: load right tileset (compare mode)");

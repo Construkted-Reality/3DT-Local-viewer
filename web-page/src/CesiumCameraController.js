@@ -72,6 +72,9 @@ class CesiumCameraController{
                 roll : this._camera.roll
             }
         });
+
+        // setView does not auto-request a render under requestRenderMode.
+        this._cesiumViewer.scene.requestRender();
     }
 
     get speed(){

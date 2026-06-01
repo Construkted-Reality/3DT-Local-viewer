@@ -1,38 +1,37 @@
 {
   "idleBaseline": {
-    "renders": 481,
-    "postUpdates": 481,
-    "seconds": 4,
-    "rendersPerSec": 120.3,
-    "postUpdatesPerSec": 120.3
-  },
-  "idleTrace": {
-    "label": "idle-baseline",
-    "events": 68295,
-    "file": "tools/traces/trace-idle-baseline.json"
-  },
-  "creditPatch": {
-    "iterations": 2000,
-    "totalMs": 38.5,
-    "perFrameMs": 0.0192
-  },
-  "idleRequestRenderMode": {
     "renders": 40,
     "postUpdates": 481,
     "seconds": 4,
     "rendersPerSec": 10,
     "postUpdatesPerSec": 120.3
   },
+  "idleTrace": {
+    "label": "idle-baseline",
+    "events": 65931,
+    "file": "tools/traces/trace-idle-baseline.json"
+  },
+  "creditPatch": {
+    "iterations": 2000,
+    "totalMs": 39.6,
+    "perFrameMs": 0.0198
+  },
+  "interactions": {
+    "flyIdle_rps": 10,
+    "wHeld_rps": 120,
+    "wReleased_rps": 10,
+    "rotateDrag_renders": 20
+  },
   "idleCompareMode": {
-    "renders": 480,
+    "renders": 40,
     "postUpdates": 480,
     "seconds": 4,
-    "rendersPerSec": 120,
+    "rendersPerSec": 10,
     "postUpdatesPerSec": 120
   },
   "mirrorCost": {
     "iterations": 5000,
-    "totalMs": 3,
+    "totalMs": 2.8,
     "perFrameMs": 0.0006
   }
 }

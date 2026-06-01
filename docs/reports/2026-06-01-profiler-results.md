@@ -82,3 +82,32 @@ in doubt.
    live). Re-run the harness after to confirm idle renders/s collapses.
 2. **Fold M5 + L-P1 into a cleanup commit**, not a perf one. No urgency.
 3. L-P2: leave as-is unless a drag trace later shows forced reflow.
+
+## Post-implementation verification (branch `feature/request-render-mode`)
+
+`requestRenderMode: true` (+ `maximumRenderTimeChange: Infinity`) was enabled at Viewer
+construction, and `scene.requestRender()` was added to every custom interaction path: the
+fly `clock.onTick` movement, the heading/pitch `camera.setView` drag, the compare-slider
+drag, and the FXAA toggle (the other settings handlers already requested a render). The
+default orbit/zoom controller, tileset streaming, camera flights and resize request renders
+on their own.
+
+Re-running the harness (now with CDP-driven input) confirms the change works and does not
+freeze interaction:
+
+| Measurement | Before | After |
+|---|---|---|
+| Idle renders/s | 120.3 | **10.0** |
+| Fly mode, no key | — | 10 (quiet) |
+| **W held (fly forward)** | — | **120** (renders while moving) |
+| W released | — | 10 (quiet again) |
+| Rotate-drag, 20 mouse-moves | — | **20 renders** (one per step) |
+
+Idle rendering dropped ~92%; movement renders continuously while a key/drag is active and
+goes quiet on release. The residual ~10/s idle is failed-request churn from the incomplete
+sample tileset (missing `subtree` files), not steady state.
+
+**Not auto-verified (reasoned from code, worth a manual smoke test):** default
+orbit/zoom/pan, compare-slider drag, the SSE/skip-LOD/cache/wireframe/bbox settings sliders,
+and the Cesium tiles-inspector panel. All either call `requestRender()` in handlers we own
+or rely on Cesium's built-in render requests.
