@@ -22,8 +22,6 @@ let flags = {
 
 const defaultFLYSpeed = 2;
 
-const testOnLocal = location.hostname === "localhost" || location.hostname === "127.0.0.1";
-
 class CesiumFLYCameraController extends CesiumCameraController{
     constructor(options){
         super(options);

@@ -33,8 +33,6 @@ class NavigationControlbar{
 
             if (this._flyController.started()) {
                 this._flyController.stop();
-            } else {
-                // do nothing
             }
         });
 

@@ -11,7 +11,6 @@ import {validPitch} from "./validPitch.js"
 
 class CesiumCameraController{
     constructor(options){
-        this._isMobile = options.isMobile;
         this._enabled = false;
 
         this._cesiumViewer = options.cesiumViewer;
@@ -34,31 +33,18 @@ class CesiumCameraController{
 
         this._screenSpaceEventHandler = new ScreenSpaceEventHandler( this._canvas);
 
-        this._screenSpaceEventHandler.setInputAction(this._onMouseLButtonDoubleClicked.bind(this), ScreenSpaceEventType.LEFT_DOUBLE_CLICK);
         this._screenSpaceEventHandler.setInputAction(this._onMouseLButtonClicked.bind(this), ScreenSpaceEventType.LEFT_DOWN);
         this._screenSpaceEventHandler.setInputAction(this._onMouseUp.bind(this), ScreenSpaceEventType.LEFT_UP);
     }
 
-    _onMouseLButtonDoubleClicked(movement) {
-
-    }
-
     _onMouseLButtonClicked (movement) {
-        if(this._isMobile)
-            this._lastTapedPosition = movement.position;
-
-        if(this._startFPVPositionMobile == null) {
-            if(this._allowStartPositionTap)
-                this._startFPVPositionMobile = movement.position.clone();
-        }
-
         this._leftButtonPressed = true;
         this._cameraHeadingWhenLbuttonPressed = this._camera.heading;
         this._cameraPitchWhenLbuttonPressed = this._camera.pitch;
         this._startMousePosition = movement.position.clone();
     }
 
-    _onMouseUp (position) {
+    _onMouseUp () {
         this._leftButtonPressed = false;
     }
 

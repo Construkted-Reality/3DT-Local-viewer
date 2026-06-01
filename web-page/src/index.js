@@ -11,10 +11,6 @@ overrideCesiumCamera();
 
 window.tilesetViewer = new TilesetViewer();
 
-if (config.runMode === "web"){
-    tilesetViewer.addTileset("https://s3.us-east-2.wasabisys.com/construkted-assets/aucbzxw01n/tileset.json");
-}
-
 initSettingsPopup();
 
 

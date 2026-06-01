@@ -1,19 +1,30 @@
 import {Cesium3DTileset} from "./CesiumJsInc.js";
 
+// The SSE slider runs 0..SSE_SLIDER_MAX and maps inversely to screen-space
+// error (higher slider = lower SSE = higher detail). Keep both directions in sync.
+const SSE_SLIDER_MAX = 32;
+
+// Apply fn to every Cesium3DTileset currently in the scene.
+function forEachTileset(scene, fn) {
+    for (let i = 0; i < scene.primitives.length; ++i) {
+        const primitive = scene.primitives.get(i);
+
+        if (primitive instanceof Cesium3DTileset)
+            fn(primitive);
+    }
+}
+
 function initSettingsPopup() {
     const sseSlider = jQuery('#maximum-screen-space-error-slider');
     const sseValueInput = jQuery('#maximum-screen-space-error-value');
 
     function applyScreenSpaceError(sliderValue) {
         const scene = window.tilesetViewer.viewer.scene;
-        const sse = Math.max(1, 32 - parseFloat(sliderValue));
+        const sse = Math.max(1, SSE_SLIDER_MAX - parseFloat(sliderValue));
 
-        for (let i = 0; i < scene.primitives.length; ++i) {
-            const primitive = scene.primitives.get(i);
-
-            if(primitive instanceof Cesium3DTileset)
-                primitive.maximumScreenSpaceError = sse;
-        }
+        forEachTileset(scene, (tileset) => {
+            tileset.maximumScreenSpaceError = sse;
+        });
 
         scene.requestRender();
     }
@@ -45,13 +56,11 @@ function initSettingsPopup() {
 
     skipLodCheckbox.change(function () {
         const scene = window.tilesetViewer.viewer.scene;
+        const checked = this.checked;
 
-        for (let i = 0; i < scene.primitives.length; ++i) {
-            const primitive = scene.primitives.get(i);
-
-            if(primitive instanceof Cesium3DTileset)
-                primitive.skipLevelOfDetail = this.checked;
-        }
+        forEachTileset(scene, (tileset) => {
+            tileset.skipLevelOfDetail = checked;
+        });
 
         scene.requestRender();
     });
@@ -70,18 +79,15 @@ function initSettingsPopup() {
         const scene = window.tilesetViewer.viewer.scene;
         const bytes = megabytes * 1024 * 1024;
 
-        for (let i = 0; i < scene.primitives.length; ++i) {
-            const primitive = scene.primitives.get(i);
-
-            if(primitive instanceof Cesium3DTileset)
-                primitive.cacheBytes = bytes;
-        }
+        forEachTileset(scene, (tileset) => {
+            tileset.cacheBytes = bytes;
+        });
 
         scene.requestRender();
     });
 
     window.tilesetViewer.tilesetLoaded.addEventListener((tileset) => {
-        const sliderValue = 32 - tileset.maximumScreenSpaceError;
+        const sliderValue = SSE_SLIDER_MAX - tileset.maximumScreenSpaceError;
         sseSlider.val(sliderValue);
         sseValueInput.val(sliderValue);
         skipLodCheckbox.prop('checked', tileset.skipLevelOfDetail);
@@ -94,26 +100,22 @@ function initSettingsPopup() {
 
     jQuery('#show-hide-wireframe-checkbox').change(function () {
         const scene = window.tilesetViewer.viewer.scene;
+        const checked = this.checked;
 
-        for (let i = 0; i < scene.primitives.length; ++i) {
-            const primitive = scene.primitives.get(i);
-
-            if(primitive instanceof Cesium3DTileset)
-                primitive.debugWireframe = this.checked;
-        }
+        forEachTileset(scene, (tileset) => {
+            tileset.debugWireframe = checked;
+        });
 
         scene.requestRender();
     });
 
     jQuery('#show-bounding-box-checkbox').change(function () {
         const scene = window.tilesetViewer.viewer.scene;
+        const checked = this.checked;
 
-        for (let i = 0; i < scene.primitives.length; ++i) {
-            const primitive = scene.primitives.get(i);
-
-            if(primitive instanceof Cesium3DTileset)
-                primitive.debugShowBoundingVolume = this.checked;
-        }
+        forEachTileset(scene, (tileset) => {
+            tileset.debugShowBoundingVolume = checked;
+        });
 
         scene.requestRender();
     });
@@ -124,11 +126,7 @@ function initSettingsPopup() {
 
     const jQFxaaEnableCheckBox = jQuery('#fxaa-enable-checkbox');
 
-    jQFxaaEnableCheckBox.prop('checked', () => {
-        const viewer = window.tilesetViewer.viewer;
-
-        return viewer.scene.postProcessStages.fxaa.enabled
-    });
+    jQFxaaEnableCheckBox.prop('checked', window.tilesetViewer.viewer.scene.postProcessStages.fxaa.enabled);
 
     jQFxaaEnableCheckBox.change(function () {
         const viewer = window.tilesetViewer.viewer;

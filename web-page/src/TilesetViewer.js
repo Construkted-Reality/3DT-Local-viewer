@@ -77,7 +77,6 @@ class TilesetViewer {
         });
 
         this._flyController = new CesiumFLYCameraController({
-            isMobile: false,
             cesiumViewer: this._viewer
         });
 
