@@ -78,7 +78,7 @@ ipcMain.handle('window-is-maximized', () => {
     return mainWindow ? mainWindow.isMaximized() : false;
 });
 
-function loadTilesetForSlot(slot) {
+async function loadTilesetForSlot(slot) {
     if (!mainWindow) return;
 
     const tilesetPath = dialog.showOpenDialogSync(mainWindow, {
@@ -86,7 +86,7 @@ function loadTilesetForSlot(slot) {
         properties: ['openFile'],
     });
 
-    if (!tilesetPath) return;
+    if (!tilesetPath || tilesetPath.length === 0) return;
 
     const dir = path.dirname(tilesetPath[0]);
     const baseName = path.basename(tilesetPath[0]);
@@ -94,7 +94,23 @@ function loadTilesetForSlot(slot) {
     const method = slot === 'right' ? 'addRightTileset' : 'addTileset';
 
     stopServer(slot);
-    startServer(slot, port, dir);
+
+    // Wait until the socket is actually listening before telling the renderer
+    // to fetch from it; a bind failure rejects here instead of killing the app.
+    try {
+        await startServer(slot, port, dir);
+    } catch (err) {
+        if (!mainWindow) return;
+        dialog.showMessageBoxSync(mainWindow, {
+            type: "error",
+            title: "Error",
+            message: "Could not start the tileset server.",
+            detail: err && err.message ? err.message : String(err)
+        });
+        return;
+    }
+
+    if (!mainWindow) return;
 
     const tilesetUrl = `http://localhost:${port}/${baseName}`;
     const folderName = path.basename(dir);

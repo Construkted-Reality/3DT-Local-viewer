@@ -6,6 +6,22 @@
 
 const servers = {};
 
+// Register a single SIGINT handler once at module load. startServer used to
+// add a fresh handler on every call, leaking listeners (MaxListenersExceeded
+// after ~10 tileset selections) and retaining stale, already-closed servers.
+process.on("SIGINT", function () {
+    Object.keys(servers).forEach(function (id) {
+        try {
+            servers[id].close();
+        } catch (e) {
+            // already closed
+        }
+        delete servers[id];
+    });
+});
+
+// Returns a Promise that resolves once the socket is actually listening and
+// rejects (instead of killing the whole Electron process) on a bind error.
 function startServer(id, port, dir) {
     if (servers[id]) {
         servers[id].close();
@@ -86,54 +102,37 @@ function startServer(id, port, dir) {
 
     app.use(express.static(dir));
 
-    const server = app.listen(
-        port,
-        "localhost",
-        function () {
+    return new Promise(function (resolve, reject) {
+        const server = app.listen(port, "localhost");
+        servers[id] = server;
+
+        server.on("listening", function () {
             console.log(
-                "Cesium development server running locally.  Connect to http://localhost:%d/",
+                "Tileset server running locally. Connect to http://localhost:%d/",
                 server.address().port
             );
-        }
-    );
-    servers[id] = server;
+            resolve(server);
+        });
 
-    server.on("error", function (e) {
-        if (e.code === "EADDRINUSE") {
-            console.log(
-                "Error: Port %d is already in use, select a different port.", port
-            );
-            console.log("Example: node server.cjs --port %d", port + 1);
-        } else if (e.code === "EACCES") {
-            console.log(
-                "Error: This process does not have permission to listen on port %d.", port
-            );
-            if (port < 1024) {
-                console.log("Try a port number higher than 1024.");
+        server.on("error", function (e) {
+            delete servers[id];
+
+            let message;
+            if (e.code === "EADDRINUSE") {
+                message = `Port ${port} is already in use. Another instance of the viewer may already be running.`;
+            } else if (e.code === "EACCES") {
+                message = `This process does not have permission to listen on port ${port}.`;
+            } else {
+                message = e.message;
             }
-        }
 
-        console.log(e);
-        process.exit(1);
-    });
+            console.error(e);
+            reject(new Error(message));
+        });
 
-    server.on("close", function () {
-        console.log("Cesium development server stopped.");
-    });
-
-    let isFirstSig = true;
-
-    process.on("SIGINT", function () {
-        if (isFirstSig) {
-            console.log("Cesium development server shutting down.");
-            server.close(function () {
-                process.exit(0);
-            });
-            isFirstSig = false;
-        } else {
-            console.log("Cesium development server force kill.");
-            process.exit(1);
-        }
+        server.on("close", function () {
+            console.log("Tileset server stopped.");
+        });
     });
 }
 
