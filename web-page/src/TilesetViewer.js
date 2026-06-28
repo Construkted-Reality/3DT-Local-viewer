@@ -104,7 +104,7 @@ class TilesetViewer {
 
         // TODO(measurement): re-enable measurement tools.
         // The previous bundled CesiumMeasurementPlugin.js targeted Cesium 1.81's
-        // internals and breaks against 1.140 (Cesium.EMPTY_OBJECT no longer exposed).
+        // internals and breaks against 1.142 (Cesium.EMPTY_OBJECT no longer exposed).
         // Replace with a current-Cesium-compatible measurement implementation
         // (or rewrite using the public Cesium API).
 

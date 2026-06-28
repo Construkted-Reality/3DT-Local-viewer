@@ -5,7 +5,7 @@ This viewer displays [3D Tiles](https://github.com/CesiumGS/3d-tiles) datasets o
 
 - No installation required (portable build)
 - No internet connection required
-- Supports 3D Tiles **1.0** and **1.1** (e.g. UltraMesh 2.x output) via Cesium 1.140
+- Supports 3D Tiles **1.0** and **1.1** (e.g. UltraMesh 2.x output) via Cesium 1.142
 - Cross-platform: Windows, Linux, macOS
 
 > **Note:** The measurement tools available in earlier versions are temporarily disabled. The previous third-party measurement plugin was incompatible with current Cesium; a replacement is tracked as a TODO in `web-page/src/TilesetViewer.js`.
@@ -28,7 +28,7 @@ This viewer displays [3D Tiles](https://github.com/CesiumGS/3d-tiles) datasets o
 │   ├── index.html
 │   ├── renderer.js
 │   ├── src/              # Application source (bundled by rollup → app.js)
-│   ├── Cesium-1.140/     # Bundled Cesium build
+│   ├── Cesium-1.142/     # Bundled Cesium build
 │   └── rollup.config.js
 └── package.json
 ```
