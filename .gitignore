@@ -14,3 +14,16 @@ out/
 
 # Large raw profiler traces (regenerate via tools/profile-harness.js); summary.json is kept
 /tools/traces/trace-*.json
+
+# Regenerable probe outputs (tools/pivot-probe.js, tools/verify-snap.js, tools/gs-verify.js)
+/tools/traces/pivot-probe.json
+/tools/traces/verify-snap.json
+/tools/traces/verify-snap-marker.png
+/tools/traces/gs-verify.json
+/tools/traces/gs-verify.png
+/tools/traces/gs-verify-marker.png
+/tools/traces/gs-snap-test.json
+/tools/traces/gs-snap-test.png
+/tools/traces/gs-spike.json
+/tools/traces/gs-spike-v1.png
+/tools/traces/gs-spike-v2.png

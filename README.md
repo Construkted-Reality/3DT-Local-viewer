@@ -5,7 +5,7 @@ This viewer displays [3D Tiles](https://github.com/CesiumGS/3d-tiles) datasets o
 
 - No installation required (portable build)
 - No internet connection required
-- Supports 3D Tiles **1.0** and **1.1** (e.g. UltraMesh 2.x output) via Cesium 1.140
+- Supports 3D Tiles **1.0** and **1.1** (e.g. UltraMesh 2.x output) via Cesium 1.142
 - Cross-platform: Windows, Linux, macOS
 
 > **Note:** The measurement tools available in earlier versions are temporarily disabled. The previous third-party measurement plugin was incompatible with current Cesium; a replacement is tracked as a TODO in `web-page/src/TilesetViewer.js`.
@@ -28,7 +28,7 @@ This viewer displays [3D Tiles](https://github.com/CesiumGS/3d-tiles) datasets o
 │   ├── index.html
 │   ├── renderer.js
 │   ├── src/              # Application source (bundled by rollup → app.js)
-│   ├── Cesium-1.140/     # Bundled Cesium build
+│   ├── Cesium-1.142/     # Bundled Cesium build
 │   └── rollup.config.js
 └── package.json
 ```
@@ -86,6 +86,8 @@ A full make on a single platform takes roughly 5–30 minutes depending on host.
 3. Pick a `tileset.json` file from disk. The viewer will start a local Express server in the parent directory and load the tileset.
 
 The previous Windows-only restriction on the file picker has been removed; the viewer now opens tilesets on Linux, macOS, and Windows.
+
+When navigating in normal (orbit) mode, the camera's rotate/tilt/zoom pivot automatically snaps to the nearest visible point on the tileset under the cursor, and a small crosshair marks the rotation centre while you left-drag to rotate. This means clicking slightly off the model — or through a gap in something like a lattice tower — still orbits a sensible point on the model nearest the camera rather than a far-away one. It works for both mesh and Gaussian-splat tilesets. It is automatic and does not apply in Fly mode.
 
 Open **Settings** (the gear icon in the right-hand Tools sidebar) and enable **Show 3D Tiles Inspector** to display the CesiumJS 3D Tiles Inspector widget (hidden by default). In side-by-side comparison mode, the inspector's display and debug settings are applied to both the left and right tilesets simultaneously.
 

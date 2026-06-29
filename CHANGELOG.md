@@ -1,5 +1,11 @@
 # Change Log
 
+### Unreleased
+
+#### Changed
+
+- Upgraded bundled CesiumJS from 1.140 to 1.142.
+
 ### 1.4.0 - 2026-05-31
 
 #### Added

@@ -2,12 +2,14 @@
 // Add a name here on demand rather than mirroring the whole Cesium surface.
 const CameraEventType = Cesium.CameraEventType;
 const Cartographic = Cesium.Cartographic;
+const Cartesian2 = Cesium.Cartesian2;
 const Cartesian3 = Cesium.Cartesian3;
 const Cesium3DTileset = Cesium.Cesium3DTileset;
 const Color = Cesium.Color;
 const Ion = Cesium.Ion;
 const KeyboardEventModifier = Cesium.KeyboardEventModifier;
 const Math = Cesium.Math;
+const Matrix4 = Cesium.Matrix4;
 const ScreenSpaceEventHandler = Cesium.ScreenSpaceEventHandler;
 const ScreenSpaceEventType = Cesium.ScreenSpaceEventType;
 const SplitDirection = Cesium.SplitDirection;
@@ -18,12 +20,14 @@ const viewerCesium3DTilesInspectorMixin = Cesium.viewerCesium3DTilesInspectorMix
 export {
     CameraEventType,
     Cartographic,
+    Cartesian2,
     Cartesian3,
     Cesium3DTileset,
     Color,
     Ion,
     KeyboardEventModifier,
     Math,
+    Matrix4,
     ScreenSpaceEventHandler,
     ScreenSpaceEventType,
     SplitDirection,

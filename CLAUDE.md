@@ -41,9 +41,48 @@ Existing explicit `requestRender()` calls (keep this list current if you add mor
 - `CesiumCameraController.js` — heading/pitch drag (`camera.setView`)
 - `TilesetViewer.js` `_buildCompareSlider` — compare-slider drag
 - `initSettingsPopup.js` — every settings handler (SSE, skip-LOD, cache, wireframe, bbox, FXAA)
+- `RotationCenterSnap.js` — rotation-centre marker show/hide
 
 Per-frame `scene.preUpdate`/`scene.postUpdate` listeners still fire every animation frame
 regardless of requestRenderMode — do not put expensive work there.
+
+## Rotation-centre snapping (`RotationCenterSnap.js`)
+
+Orbit/tilt/zoom snap their pivot to the nearest tileset point under the cursor, and a
+crosshair marker shows the rotation centre during left-drag. This is done **without
+forking Cesium**: the stock `ScreenSpaceCameraController` derives every gesture's pivot
+from `scene.pickPositionWorldCoordinates`, so we shadow that one instance method with a
+9-sample neighbourhood search (cursor pixel + a ring at `SNAP_RADIUS_PX`) and return the
+hit **nearest the camera**. Nearest-to-camera (not nearest-to-cursor) is what makes a
+click through a hole in e.g. a lattice tower snap to the near member rather than the far
+background. A genuine miss returns `undefined` (no fallback — the globe is hidden), so the
+controller just rotates in place.
+
+- Verified against real 1.142 with `tools/pivot-probe.js` (which gesture calls the pick,
+  how often) and `tools/verify-snap.js` (the feature: near-miss snaps, far pixel doesn't,
+  marker shows/hides, camera orbits the pivot, fly mode inert). Both write `tools/traces/`.
+- The marker is a **DOM overlay** (`_markerEl` in `viewer.container`), NOT a Cesium
+  billboard. A billboard renders in the TRANSLUCENT pass (9) but Gaussian splats render
+  later (GAUSSIAN_SPLATS pass 11) and paint over it, so a billboard marker is invisible on
+  splats. The DOM element sits above the canvas and shows on any content; while a left-drag
+  is active we project the fixed world pivot to the screen each `postRender` (the camera
+  orbits it). It has a dark halo so it reads on bright (over-exposed splat) backgrounds.
+- **Gaussian-splat tilesets** (`SplatPivotSource.js`): splats are NOT depth-pickable in
+  1.142 — `pickPositionWorldCoordinates` and `scene.pick` both return nothing (they write
+  no depth, carry no pick id; upstream CesiumGS/cesium#13326). So when the mesh depth-pick
+  ring misses, `_resolve` falls back to the nearest **splat centre**: we read
+  `tileset.gaussianSplatPrimitive._positions`/`_scales`/`_colors` + `_rootTransform`
+  (private fields — re-verify on Cesium upgrade), drop floaters by opacity, decimate to a
+  capped world-space set, and return the centre NEAREST THE CAMERA among those projecting
+  within `SPLAT_SNAP_RADIUS_PX` of the cursor (foreground preference → lattice case holds).
+  An invisible depth-writing point overlay was rejected: opaque depth points occlude the
+  translucent splats (black holes). Verified with `tools/gs-verify.js` against a real
+  `KHR_gaussian_splatting` tileset (snap resolves, marker visible, camera orbits, no crash).
+- TODO (Adrian wants to try later): replace the pick-wrap by **owning the orbit/pan/zoom
+  handlers** directly (disable Cesium's `rotate`/`tilt`/`zoom` event types and drive the
+  camera ourselves around the resolved pivot). More code and we'd re-tune the interaction
+  feel, but zero coupling to Cesium's internal pick routing — which the wrap depends on and
+  must be re-checked on each Cesium upgrade (run `pivot-probe.js`).
 
 ## Profiling
 

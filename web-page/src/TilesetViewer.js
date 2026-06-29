@@ -17,6 +17,7 @@ import {geoReferenced} from "./util";
 import {CesiumFLYCameraController} from "./CesiumFLYCameraController";
 import {NavigationControlbar} from "./NavigationControlbar"
 import {mirrorTilesetSettings} from "./mirrorTilesetSettings";
+import {RotationCenterSnap} from "./RotationCenterSnap";
 
 class TilesetViewer {
     constructor() {
@@ -90,6 +91,15 @@ class TilesetViewer {
             cesiumViewer: this._viewer
         });
 
+        // Snap the rotate/tilt/zoom pivot to the nearest tileset point under the
+        // cursor and show a rotation-centre marker. Inert while fly mode owns the
+        // camera. See RotationCenterSnap.js.
+        this._rotationCenterSnap = new RotationCenterSnap({
+            viewer: this._viewer,
+            isFlyActive: () => this._flyController.started(),
+            getTilesets: () => [this._leftTileset, this._rightTileset],
+        });
+
         const controlbarContainer = document.createElement("div");
 
         controlbarContainer.className = "construkted-viewer-controlbarContainer";
@@ -104,7 +114,7 @@ class TilesetViewer {
 
         // TODO(measurement): re-enable measurement tools.
         // The previous bundled CesiumMeasurementPlugin.js targeted Cesium 1.81's
-        // internals and breaks against 1.140 (Cesium.EMPTY_OBJECT no longer exposed).
+        // internals and breaks against 1.142 (Cesium.EMPTY_OBJECT no longer exposed).
         // Replace with a current-Cesium-compatible measurement implementation
         // (or rewrite using the public Cesium API).
 

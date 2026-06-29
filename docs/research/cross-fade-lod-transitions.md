@@ -101,7 +101,7 @@ Cost: 3 days to 2 weeks depending on which option and how many edge cases bite. 
 
 ## Risks and gotchas
 
-- **Cesium-version coupling.** Anything touching `Cesium3DTilesetTraversal` (Phase 3A) couples this codebase to Cesium internals. Every Cesium bump requires re-verification. We currently track Cesium 1.140; upgrades happen.
+- **Cesium-version coupling.** Anything touching `Cesium3DTilesetTraversal` (Phase 3A) couples this codebase to Cesium internals. Every Cesium bump requires re-verification. We currently track Cesium 1.142; upgrades happen.
 - **Performance during fast camera moves.** Many tiles fading simultaneously could spike draw calls. Cesium for Unreal explicitly mitigates this; we'd need to too, likely by capping concurrent fades and instantly resolving the rest.
 - **Custom attributes / metadata.** If we ever want per-tile custom shaders for *other* features (highlighting, classification, etc.), the per-tile shader instances added in Phase 1 need a clear extension story so we don't end up with multiple competing shader assignments on the same tile.
 - **`Cesium3DTileset.tileVisible` fires every frame.** Per-tile uniform updates on hundreds of tiles per frame must be cheap (avoid object allocations in the hot path).
