@@ -72,7 +72,7 @@ app.whenReady().then(async () => {
         await sleep(SETTLE_MS);
 
         results.snapInstalled = await wc.executeJavaScript(`!!window.tilesetViewer._rotationCenterSnap`);
-        results.markerExists = await wc.executeJavaScript(`!!window.tilesetViewer._rotationCenterSnap._marker`);
+        results.markerExists = await wc.executeJavaScript(`!!window.tilesetViewer._rotationCenterSnap._markerEl`);
 
         // A. _resolve unit check. Find an on-model pixel, a near-miss pixel (raw
         // miss but a hit within R), and a far pixel (no hit within R).
@@ -132,8 +132,8 @@ app.whenReady().then(async () => {
         await dbg.sendCommand("Input.dispatchMouseEvent", {type:"mousePressed",x:cx,y:cy,button:"left",buttons:1,clickCount:1});
         await sleep(50);
         const camBefore = await wc.executeJavaScript(`(()=>{const p=window.tilesetViewer.viewer.camera.positionWC;return{x:p.x,y:p.y,z:p.z};})()`);
-        results.markerShownOnDown = await wc.executeJavaScript(`(()=>{const m=window.tilesetViewer._rotationCenterSnap._marker;
-            return {show:m.show, hasPos: window.Cesium.defined(m.position) };})()`);
+        results.markerShownOnDown = await wc.executeJavaScript(`(()=>{const m=window.tilesetViewer._rotationCenterSnap;
+            return {show:m._markerEl.style.display==='block', hasPos: window.Cesium.defined(m._markerWorld) };})()`);
         for (let i=1;i<=15;i++){ await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mouseMoved",x:cx+i*5,y:cy+i*2,button:"left",buttons:1}); await sleep(16);}
         const camAfter = await wc.executeJavaScript(`(()=>{const p=window.tilesetViewer.viewer.camera.positionWC;return{x:p.x,y:p.y,z:p.z};})()`);
         // Capture the window mid-drag so the rotation-centre marker is visible.
@@ -144,14 +144,14 @@ app.whenReady().then(async () => {
         } catch (e) { log("screenshot failed", e.message); }
         await dbg.sendCommand("Input.dispatchMouseEvent", {type:"mouseReleased",x:cx+75,y:cy+30,button:"left",buttons:0,clickCount:1});
         await sleep(50);
-        results.markerHiddenOnUp = await wc.executeJavaScript(`window.tilesetViewer._rotationCenterSnap._marker.show === false`);
+        results.markerHiddenOnUp = await wc.executeJavaScript(`window.tilesetViewer._rotationCenterSnap._markerEl.style.display === 'none'`);
         results.orbitPosDelta = +Math.hypot(camAfter.x-camBefore.x, camAfter.y-camBefore.y, camAfter.z-camBefore.z).toFixed(2);
 
         // D. fly mode -> marker stays hidden.
         await wc.executeJavaScript(`window.tilesetViewer.flyController.start(); true`);
         await dbg.sendCommand("Input.dispatchMouseEvent", {type:"mousePressed",x:cx,y:cy,button:"left",buttons:1,clickCount:1});
         await sleep(50);
-        results.markerHiddenInFly = await wc.executeJavaScript(`window.tilesetViewer._rotationCenterSnap._marker.show === false`);
+        results.markerHiddenInFly = await wc.executeJavaScript(`window.tilesetViewer._rotationCenterSnap._markerEl.style.display === 'none'`);
         await dbg.sendCommand("Input.dispatchMouseEvent", {type:"mouseReleased",x:cx,y:cy,button:"left",buttons:0,clickCount:1});
         await wc.executeJavaScript(`window.tilesetViewer.flyController.stop(); true`);
 

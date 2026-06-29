@@ -61,15 +61,23 @@ controller just rotates in place.
 - Verified against real 1.142 with `tools/pivot-probe.js` (which gesture calls the pick,
   how often) and `tools/verify-snap.js` (the feature: near-miss snaps, far pixel doesn't,
   marker shows/hides, camera orbits the pivot, fly mode inert). Both write `tools/traces/`.
-- The marker is an SVG-data-URI billboard entity with depth test disabled; it follows the
-  rotation centre only on plain left-drag (rotate), and is inert while fly mode owns the
-  camera.
-- **Gaussian-splat tilesets**: the snap is INERT on `KHR_gaussian_splatting` content.
-  Cesium 1.142 renders splats but they are not pickable — `pickPositionWorldCoordinates`
-  AND `scene.pick` both return nothing on them (verified: 0/558 grid hits, no crash). So
-  `_resolve` finds no geometry, the pivot doesn't snap and the marker never shows; the
-  viewer just falls back to Cesium's default rotate. Mesh tilesets are unaffected. Adding
-  splat support would need a different mechanism (e.g. snap against tile bounding volumes).
+- The marker is a **DOM overlay** (`_markerEl` in `viewer.container`), NOT a Cesium
+  billboard. A billboard renders in the TRANSLUCENT pass (9) but Gaussian splats render
+  later (GAUSSIAN_SPLATS pass 11) and paint over it, so a billboard marker is invisible on
+  splats. The DOM element sits above the canvas and shows on any content; while a left-drag
+  is active we project the fixed world pivot to the screen each `postRender` (the camera
+  orbits it). It has a dark halo so it reads on bright (over-exposed splat) backgrounds.
+- **Gaussian-splat tilesets** (`SplatPivotSource.js`): splats are NOT depth-pickable in
+  1.142 — `pickPositionWorldCoordinates` and `scene.pick` both return nothing (they write
+  no depth, carry no pick id; upstream CesiumGS/cesium#13326). So when the mesh depth-pick
+  ring misses, `_resolve` falls back to the nearest **splat centre**: we read
+  `tileset.gaussianSplatPrimitive._positions`/`_scales`/`_colors` + `_rootTransform`
+  (private fields — re-verify on Cesium upgrade), drop floaters by opacity, decimate to a
+  capped world-space set, and return the centre NEAREST THE CAMERA among those projecting
+  within `SPLAT_SNAP_RADIUS_PX` of the cursor (foreground preference → lattice case holds).
+  An invisible depth-writing point overlay was rejected: opaque depth points occlude the
+  translucent splats (black holes). Verified with `tools/gs-verify.js` against a real
+  `KHR_gaussian_splatting` tileset (snap resolves, marker visible, camera orbits, no crash).
 - TODO (Adrian wants to try later): replace the pick-wrap by **owning the orbit/pan/zoom
   handlers** directly (disable Cesium's `rotate`/`tilt`/`zoom` event types and drive the
   camera ourselves around the resolved pivot). More code and we'd re-tune the interaction

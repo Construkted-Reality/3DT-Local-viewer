@@ -97,6 +97,7 @@ class TilesetViewer {
         this._rotationCenterSnap = new RotationCenterSnap({
             viewer: this._viewer,
             isFlyActive: () => this._flyController.started(),
+            getTilesets: () => [this._leftTileset, this._rightTileset],
         });
 
         const controlbarContainer = document.createElement("div");

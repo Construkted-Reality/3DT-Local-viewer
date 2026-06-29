@@ -9,6 +9,7 @@ const Color = Cesium.Color;
 const Ion = Cesium.Ion;
 const KeyboardEventModifier = Cesium.KeyboardEventModifier;
 const Math = Cesium.Math;
+const Matrix4 = Cesium.Matrix4;
 const ScreenSpaceEventHandler = Cesium.ScreenSpaceEventHandler;
 const ScreenSpaceEventType = Cesium.ScreenSpaceEventType;
 const SplitDirection = Cesium.SplitDirection;
@@ -26,6 +27,7 @@ export {
     Ion,
     KeyboardEventModifier,
     Math,
+    Matrix4,
     ScreenSpaceEventHandler,
     ScreenSpaceEventType,
     SplitDirection,
