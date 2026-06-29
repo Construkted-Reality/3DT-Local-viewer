@@ -17,6 +17,7 @@ import {geoReferenced} from "./util";
 import {CesiumFLYCameraController} from "./CesiumFLYCameraController";
 import {NavigationControlbar} from "./NavigationControlbar"
 import {mirrorTilesetSettings} from "./mirrorTilesetSettings";
+import {RotationCenterSnap} from "./RotationCenterSnap";
 
 class TilesetViewer {
     constructor() {
@@ -88,6 +89,14 @@ class TilesetViewer {
 
         this._flyController = new CesiumFLYCameraController({
             cesiumViewer: this._viewer
+        });
+
+        // Snap the rotate/tilt/zoom pivot to the nearest tileset point under the
+        // cursor and show a rotation-centre marker. Inert while fly mode owns the
+        // camera. See RotationCenterSnap.js.
+        this._rotationCenterSnap = new RotationCenterSnap({
+            viewer: this._viewer,
+            isFlyActive: () => this._flyController.started(),
         });
 
         const controlbarContainer = document.createElement("div");

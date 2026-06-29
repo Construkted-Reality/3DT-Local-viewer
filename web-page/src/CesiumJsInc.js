@@ -2,6 +2,7 @@
 // Add a name here on demand rather than mirroring the whole Cesium surface.
 const CameraEventType = Cesium.CameraEventType;
 const Cartographic = Cesium.Cartographic;
+const Cartesian2 = Cesium.Cartesian2;
 const Cartesian3 = Cesium.Cartesian3;
 const Cesium3DTileset = Cesium.Cesium3DTileset;
 const Color = Cesium.Color;
@@ -18,6 +19,7 @@ const viewerCesium3DTilesInspectorMixin = Cesium.viewerCesium3DTilesInspectorMix
 export {
     CameraEventType,
     Cartographic,
+    Cartesian2,
     Cartesian3,
     Cesium3DTileset,
     Color,

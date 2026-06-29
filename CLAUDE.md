@@ -41,9 +41,34 @@ Existing explicit `requestRender()` calls (keep this list current if you add mor
 - `CesiumCameraController.js` — heading/pitch drag (`camera.setView`)
 - `TilesetViewer.js` `_buildCompareSlider` — compare-slider drag
 - `initSettingsPopup.js` — every settings handler (SSE, skip-LOD, cache, wireframe, bbox, FXAA)
+- `RotationCenterSnap.js` — rotation-centre marker show/hide
 
 Per-frame `scene.preUpdate`/`scene.postUpdate` listeners still fire every animation frame
 regardless of requestRenderMode — do not put expensive work there.
+
+## Rotation-centre snapping (`RotationCenterSnap.js`)
+
+Orbit/tilt/zoom snap their pivot to the nearest tileset point under the cursor, and a
+crosshair marker shows the rotation centre during left-drag. This is done **without
+forking Cesium**: the stock `ScreenSpaceCameraController` derives every gesture's pivot
+from `scene.pickPositionWorldCoordinates`, so we shadow that one instance method with a
+9-sample neighbourhood search (cursor pixel + a ring at `SNAP_RADIUS_PX`) and return the
+hit **nearest the camera**. Nearest-to-camera (not nearest-to-cursor) is what makes a
+click through a hole in e.g. a lattice tower snap to the near member rather than the far
+background. A genuine miss returns `undefined` (no fallback — the globe is hidden), so the
+controller just rotates in place.
+
+- Verified against real 1.142 with `tools/pivot-probe.js` (which gesture calls the pick,
+  how often) and `tools/verify-snap.js` (the feature: near-miss snaps, far pixel doesn't,
+  marker shows/hides, camera orbits the pivot, fly mode inert). Both write `tools/traces/`.
+- The marker is an SVG-data-URI billboard entity with depth test disabled; it follows the
+  rotation centre only on plain left-drag (rotate), and is inert while fly mode owns the
+  camera.
+- TODO (Adrian wants to try later): replace the pick-wrap by **owning the orbit/pan/zoom
+  handlers** directly (disable Cesium's `rotate`/`tilt`/`zoom` event types and drive the
+  camera ourselves around the resolved pivot). More code and we'd re-tune the interaction
+  feel, but zero coupling to Cesium's internal pick routing — which the wrap depends on and
+  must be re-checked on each Cesium upgrade (run `pivot-probe.js`).
 
 ## Profiling
 

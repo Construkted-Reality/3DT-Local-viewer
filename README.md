@@ -87,6 +87,8 @@ A full make on a single platform takes roughly 5–30 minutes depending on host.
 
 The previous Windows-only restriction on the file picker has been removed; the viewer now opens tilesets on Linux, macOS, and Windows.
 
+When navigating in normal (orbit) mode, the camera's rotate/tilt/zoom pivot automatically snaps to the nearest visible point on the tileset under the cursor, and a small crosshair marks the rotation centre while you left-drag to rotate. This means clicking slightly off the model — or through a gap in something like a lattice tower — still orbits a sensible point on the model nearest the camera rather than a far-away one. It is automatic and does not apply in Fly mode.
+
 Open **Settings** (the gear icon in the right-hand Tools sidebar) and enable **Show 3D Tiles Inspector** to display the CesiumJS 3D Tiles Inspector widget (hidden by default). In side-by-side comparison mode, the inspector's display and debug settings are applied to both the left and right tilesets simultaneously.
 
 ## Release process
