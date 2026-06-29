@@ -64,6 +64,12 @@ controller just rotates in place.
 - The marker is an SVG-data-URI billboard entity with depth test disabled; it follows the
   rotation centre only on plain left-drag (rotate), and is inert while fly mode owns the
   camera.
+- **Gaussian-splat tilesets**: the snap is INERT on `KHR_gaussian_splatting` content.
+  Cesium 1.142 renders splats but they are not pickable — `pickPositionWorldCoordinates`
+  AND `scene.pick` both return nothing on them (verified: 0/558 grid hits, no crash). So
+  `_resolve` finds no geometry, the pivot doesn't snap and the marker never shows; the
+  viewer just falls back to Cesium's default rotate. Mesh tilesets are unaffected. Adding
+  splat support would need a different mechanism (e.g. snap against tile bounding volumes).
 - TODO (Adrian wants to try later): replace the pick-wrap by **owning the orbit/pan/zoom
   handlers** directly (disable Cesium's `rotate`/`tilt`/`zoom` event types and drive the
   camera ourselves around the resolved pivot). More code and we'd re-tune the interaction
