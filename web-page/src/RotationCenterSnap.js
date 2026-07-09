@@ -44,6 +44,12 @@ const SPLAT_SNAP_RADIUS_PX = 28;
 // — we want the splat centres local to the clicked feature, not a wide neighbourhood.
 const MEASURE_REFINE_RADIUS_PX = 12;
 
+// Screen radius (px) for refining the spin/tilt pivot to full density. Same catchment as a
+// measurement click; the gain over the decimated pivot is small but the cost is one refine
+// per gesture (spin/tilt pick once), so it's affordable — unlike zoom (40-60 picks/gesture,
+// left on the decimated query).
+const PIVOT_REFINE_RADIUS_PX = 12;
+
 // Crosshair marker: a circle with a centre dot, drawn as an SVG data URI so we carry
 // no image asset. disableDepthTestDistance keeps it visible through geometry. The
 // crosshair is drawn twice — a wide dark halo under a white stroke — so it reads on
@@ -75,6 +81,16 @@ class RotationCenterSnap {
         // doesn't compete with the measurement overlay (orbit-drag still works).
         this._isMeasureActive = options.isMeasureActive || (() => false);
 
+        // Active drag gesture: "spin" (left-drag), "tilt" (right-drag), or null. Only
+        // spin/tilt refine their pivot to full density (they pick once per gesture); zoom
+        // does not (it picks 40-60x). Set by the gesture handler.
+        this._gesture = null;
+        // Monotonic count of splat-pivot refines actually performed — instrumentation for
+        // tools/gs-measure-verify.js to assert zoom never refines.
+        this._refineCount = 0;
+        // Source of the last _resolve result: "mesh" | "splat" | "none".
+        this._lastResolveSource = "none";
+
         // Gaussian-splat fallback: splats aren't depth-pickable, so when the mesh
         // depth pick misses we snap to the nearest splat centre instead.
         this._splatSource = options.getTilesets
@@ -105,19 +121,43 @@ class RotationCenterSnap {
         });
 
         scene.pickPositionWorldCoordinates = (windowPosition, result) => {
-            const snapped = this._resolve(windowPosition);
-            if (snapped) {
-                return Cartesian3.clone(snapped, result);
+            const pivot = this._pivotPoint(windowPosition);
+            if (pivot) {
+                return Cartesian3.clone(pivot, result);
             }
             return this._origPick(windowPosition, result);
         };
     }
 
-    // Nearest-to-camera hit within SNAP_RADIUS_PX of windowPosition, or undefined.
+    // The pivot point for the current gesture: the snapped hit, refined to full-density
+    // splat precision for spin/tilt (but not zoom, and not mesh hits — mesh depth is
+    // already exact). Used by both the pick shadow and the marker so they agree.
+    _pivotPoint(windowPosition) {
+        const snapped = this._resolve(windowPosition);
+        if (!snapped) return undefined;
+        if (
+            this._splatSource &&
+            this._lastResolveSource === "splat" &&
+            (this._gesture === "spin" || this._gesture === "tilt")
+        ) {
+            const refined = this._splatSource.refine(this._scene, snapped, PIVOT_REFINE_RADIUS_PX);
+            if (refined) {
+                this._refineCount++;
+                return refined.aggregate;
+            }
+        }
+        return snapped;
+    }
+
+    // Nearest-to-camera hit within SNAP_RADIUS_PX of windowPosition, or undefined. Records
+    // whether the result came from the mesh depth ring or the splat fallback in
+    // _lastResolveSource (so _pivotPoint only refines splat-derived pivots).
     _resolve(windowPosition) {
         const key = Math.round(windowPosition.x) + "," + Math.round(windowPosition.y);
         if (this._memo.has(key)) {
-            return this._memo.get(key);
+            const m = this._memo.get(key);
+            this._lastResolveSource = m.src;
+            return m.p;
         }
 
         const camPos = this._scene.camera.positionWC;
@@ -146,11 +186,14 @@ class RotationCenterSnap {
         }
 
         // Mesh depth pick found nothing — try the Gaussian-splat centre fallback.
+        let src = best !== undefined ? "mesh" : "none";
         if (best === undefined && this._splatSource) {
             best = this._splatSource.query(this._scene, windowPosition, SPLAT_SNAP_RADIUS_PX);
+            if (best !== undefined) src = "splat";
         }
 
-        this._memo.set(key, best);
+        this._memo.set(key, {p: best, src});
+        this._lastResolveSource = src;
         return best;
     }
 
@@ -210,15 +253,32 @@ class RotationCenterSnap {
     _installGestureHandler() {
         this._handler = new ScreenSpaceEventHandler(this._scene.canvas);
 
+        // Left-drag = spin, right-drag = tilt. Set the gesture BEFORE resolving the pivot
+        // so _pivotPoint knows to refine. (Cesium's controller re-picks during the drag;
+        // the gesture is already set by then.) The marker uses _pivotPoint too, so the
+        // crosshair sits on the same refined point Cesium orbits.
         this._handler.setInputAction((event) => {
+            this._gesture = "spin";
             if (this._isFlyActive() || this._isMeasureActive()) return;
-            const point = this._resolve(event.position);
+            const point = this._pivotPoint(event.position);
             if (point) {
                 this._showMarkerAt(point);
             }
         }, ScreenSpaceEventType.LEFT_DOWN);
 
-        this._handler.setInputAction(() => this._hideMarker(), ScreenSpaceEventType.LEFT_UP);
+        this._handler.setInputAction(() => {
+            this._gesture = null;
+            this._hideMarker();
+        }, ScreenSpaceEventType.LEFT_UP);
+
+        // Tilt (right-drag orbit) also refines its pivot, but shows no marker for now.
+        this._handler.setInputAction(() => {
+            this._gesture = "tilt";
+        }, ScreenSpaceEventType.RIGHT_DOWN);
+
+        this._handler.setInputAction(() => {
+            this._gesture = null;
+        }, ScreenSpaceEventType.RIGHT_UP);
     }
 
     // --- measurement resolution ---------------------------------------------

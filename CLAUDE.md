@@ -78,6 +78,18 @@ controller just rotates in place.
   An invisible depth-writing point overlay was rejected: opaque depth points occlude the
   translucent splats (black holes). Verified with `tools/gs-verify.js` against a real
   `KHR_gaussian_splatting` tileset (snap resolves, marker visible, camera orbits, no crash).
+- **Spin/tilt pivot refine** (`SplatPivotSource.refine`, `_pivotPoint`): for a splat-derived
+  pivot on **spin (left-drag) and tilt (right-drag) only** — each picks once per gesture —
+  the decimated centre is refined to full density (`_positions` scanned in the tileset local
+  frame, opacity-weighted k-nearest → the pivot). **Zoom is left on the decimated `query()`**
+  (it picks 40-60x/gesture; refining there would reintroduce the per-frame O(N) cost). The
+  active gesture is tracked by the LEFT/RIGHT down/up handlers; `_lastResolveSource` gates
+  refine to splat pivots (mesh depth is already exact). `_refineCount` instruments this for
+  `tools/gs-measure-verify.js` (asserts tilt refines, zoom does not). Note: Cesium's
+  "rotate" = spin/grab-surface, "tilt" = orbit-around-point — the names are counter-intuitive.
+- **Measurement** (`MeasureTool.js`, `resolveMeasurement`): same full-density refine, one-shot
+  per click, with an opacity-weighted-mean point + k-nearest spread (the ± uncertainty).
+  DOM/SVG overlay (not in-scene geometry — splats paint over the translucent pass).
 - TODO (Adrian wants to try later): replace the pick-wrap by **owning the orbit/pan/zoom
   handlers** directly (disable Cesium's `rotate`/`tilt`/`zoom` event types and drive the
   camera ourselves around the resolved pivot). More code and we'd re-tune the interaction

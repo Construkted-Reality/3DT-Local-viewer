@@ -136,10 +136,31 @@ app.whenReady().then(async () => {
         })()`);
         log("h3", JSON.stringify(out.h3));
 
-        // Overlay: activate MEASURE via the tool, drive two synthetic clicks, screenshot.
         const rect = await wc.executeJavaScript(`(()=>{const c=window.tilesetViewer.viewer.scene.canvas;const r=c.getBoundingClientRect();return{left:r.left,top:r.top};})()`);
-        await wc.executeJavaScript(`window.tilesetViewer._measureTool.activate()`);
         const dbg=wc.debugger; if(!dbg.isAttached())dbg.attach("1.3"); win.focus();
+        const hp0 = out.diag.hitPixel;
+        const sx=Math.round(hp0.x+rect.left), sy=Math.round(hp0.y+rect.top);
+
+        // Gesture gating: tilt (right-drag) must refine the pivot; zoom (wheel) must not.
+        // _refineCount only increments when a splat pivot is refined for spin/tilt.
+        const refCount = ()=>wc.executeJavaScript(`window.tilesetViewer._rotationCenterSnap._refineCount`);
+        // Right-drag = tilt.
+        const beforeTilt=await refCount();
+        await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mousePressed",x:sx,y:sy,button:"right",buttons:2,clickCount:1});
+        await sleep(60);
+        for(let i=1;i<=8;i++){await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mouseMoved",x:sx+i*4,y:sy+i*3,button:"right",buttons:2});await sleep(20);}
+        await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mouseReleased",x:sx+32,y:sy+24,button:"right",buttons:0,clickCount:1});
+        await sleep(60);
+        const afterTilt=await refCount();
+        // Wheel = zoom (no button down → gesture null → must not refine).
+        const beforeZoom=await refCount();
+        for(let i=0;i<10;i++){await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mouseWheel",x:sx,y:sy,deltaX:0,deltaY:-120});await sleep(25);}
+        const afterZoom=await refCount();
+        out.gating={tiltRefines:afterTilt-beforeTilt,zoomRefines:afterZoom-beforeZoom};
+        log("gating", JSON.stringify(out.gating));
+
+        // Overlay: activate MEASURE via the tool, drive two synthetic clicks, screenshot.
+        await wc.executeJavaScript(`window.tilesetViewer._measureTool.activate()`);
         const clickAt = async (px,py)=>{
             const x=Math.round(px+rect.left),y=Math.round(py+rect.top);
             await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mousePressed",x,y,button:"left",buttons:1,clickCount:1});
@@ -160,11 +181,13 @@ app.whenReady().then(async () => {
         out.PASS = out.h1.ok && out.h1.nearestErr < 1e-3 &&
                    out.h2.samples > 0 &&
                    out.h3.ok && out.h3.withinSigma &&
+                   out.gating.tiltRefines > 0 && out.gating.zoomRefines === 0 &&
                    out.overlay.aSet && out.overlay.bSet && out.overlay.svgVisible &&
                    out.errors.length===0;
         out.summary = `nearestErr=${out.h1.ok?out.h1.nearestErr:'n/a'} `+
             `delta(min/med/max)=${out.h2.minDelta}/${out.h2.medianDelta}/${out.h2.maxDelta} `+
             `H3 err=${out.h3.ok?out.h3.err:'n/a'} sigma=${out.h3.ok?out.h3.sigma:'n/a'} `+
+            `gating(tilt/zoom refines)=${out.gating.tiltRefines}/${out.gating.zoomRefines} `+
             `refineMs=${out.h1.ok?out.h1.refineMs:'n/a'} queryMs=${out.h1.ok?out.h1.lastQueryMs:'n/a'} `+
             `overlay=${out.overlay&&out.overlay.svgVisible} crash=${out.errors.length>0}`;
         log("RESULT", out.summary, out.PASS?"PASS":"FAIL");
