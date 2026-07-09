@@ -111,13 +111,17 @@ class RotationCenterSnap {
         // infinite recursion.
         this._origPick = scene.pickPositionWorldCoordinates.bind(scene);
 
-        // Per-frame memo so a zoom burst's 40+ same-pixel picks collapse to one
-        // neighbourhood search per frame. Cleared each frame.
+        // Per-frame memos so repeated same-pixel picks within a frame collapse to one
+        // neighbourhood search (_memo) and one refine (_pivotMemo). Cleared each frame.
+        // pivot-probe measured spin/tilt as one pick per gesture on a MESH tileset; splat
+        // call frequency is unmeasured, so _pivotMemo bounds refine to once/frame regardless.
         this._memo = new Map();
+        this._pivotMemo = new Map();
         this._frame = 0;
         scene.preRender.addEventListener(() => {
             this._frame++;
             this._memo.clear();
+            this._pivotMemo.clear();
         });
 
         scene.pickPositionWorldCoordinates = (windowPosition, result) => {
@@ -140,11 +144,15 @@ class RotationCenterSnap {
             this._lastResolveSource === "splat" &&
             (this._gesture === "spin" || this._gesture === "tilt")
         ) {
-            const refined = this._splatSource.refine(this._scene, snapped, PIVOT_REFINE_RADIUS_PX);
-            if (refined) {
-                this._refineCount++;
-                return refined.aggregate;
+            const key = Math.round(windowPosition.x) + "," + Math.round(windowPosition.y);
+            if (this._pivotMemo.has(key)) {
+                return this._pivotMemo.get(key);
             }
+            const refined = this._splatSource.refine(this._scene, snapped, PIVOT_REFINE_RADIUS_PX);
+            const pivot = refined ? refined.aggregate : snapped;
+            if (refined) this._refineCount++;
+            this._pivotMemo.set(key, pivot);
+            return pivot;
         }
         return snapped;
     }
