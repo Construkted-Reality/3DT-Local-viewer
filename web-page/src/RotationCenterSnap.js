@@ -40,6 +40,10 @@ const RING_SAMPLES = 8;
 // splat centres are sparser than per-pixel depth, so the cursor needs a wider catch.
 const SPLAT_SNAP_RADIUS_PX = 28;
 
+// Screen radius (px) of the full-density refine catchment for a measurement click. Small
+// — we want the splat centres local to the clicked feature, not a wide neighbourhood.
+const MEASURE_REFINE_RADIUS_PX = 12;
+
 // Crosshair marker: a circle with a centre dot, drawn as an SVG data URI so we carry
 // no image asset. disableDepthTestDistance keeps it visible through geometry. The
 // crosshair is drawn twice — a wide dark halo under a white stroke — so it reads on
@@ -67,6 +71,9 @@ class RotationCenterSnap {
         // When fly mode owns the camera the default controller is disabled and the
         // wrap is never called anyway; this only gates the marker.
         this._isFlyActive = options.isFlyActive || (() => false);
+        // While measure mode is active, suppress the pivot crosshair on left-down so it
+        // doesn't compete with the measurement overlay (orbit-drag still works).
+        this._isMeasureActive = options.isMeasureActive || (() => false);
 
         // Gaussian-splat fallback: splats aren't depth-pickable, so when the mesh
         // depth pick misses we snap to the nearest splat centre instead.
@@ -204,7 +211,7 @@ class RotationCenterSnap {
         this._handler = new ScreenSpaceEventHandler(this._scene.canvas);
 
         this._handler.setInputAction((event) => {
-            if (this._isFlyActive()) return;
+            if (this._isFlyActive() || this._isMeasureActive()) return;
             const point = this._resolve(event.position);
             if (point) {
                 this._showMarkerAt(point);
@@ -212,6 +219,35 @@ class RotationCenterSnap {
         }, ScreenSpaceEventType.LEFT_DOWN);
 
         this._handler.setInputAction(() => this._hideMarker(), ScreenSpaceEventType.LEFT_UP);
+    }
+
+    // --- measurement resolution ---------------------------------------------
+
+    // Resolve a precise world point at a pixel for measurement. Exact mesh depth hit if
+    // the mesh is under the cursor (mesh depth is already per-pixel accurate); otherwise
+    // the coarse decimated splat hit refined against the full-density splat centres.
+    // Returns { point, source: 'mesh'|'splat', spread, count, ms } or undefined on a miss.
+    resolveMeasurement(windowPosition) {
+        const meshHit = this._origPick(windowPosition, new Cartesian3());
+        if (meshHit) {
+            return { point: meshHit, source: "mesh", spread: 0, count: 1, ms: 0 };
+        }
+        if (!this._splatSource) return undefined;
+
+        const coarse = this._splatSource.query(this._scene, windowPosition, SPLAT_SNAP_RADIUS_PX);
+        if (!coarse) return undefined;
+
+        const refined = this._splatSource.refine(this._scene, coarse, MEASURE_REFINE_RADIUS_PX);
+        if (!refined) {
+            return { point: coarse, source: "splat", spread: 0, count: 0, ms: 0 };
+        }
+        return {
+            point: refined.aggregate,
+            source: "splat",
+            spread: refined.spread,
+            count: refined.count,
+            ms: refined.ms,
+        };
     }
 }
 
