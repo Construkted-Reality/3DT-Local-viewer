@@ -132,6 +132,24 @@ Manual check (Adrian): load the GS tileset, take a few measurements, confirm fee
 - **Testability:** high — every hypothesis has a headless pass/fail check plus one
   screenshot; Adrian's manual review is "click twice, read a number."
 
+## Verification status (2026-07-09)
+
+- **Phase 1 (refine): implemented + verified headlessly.** `web-page/src/SplatPivotSource.test.mjs`
+  loads Cesium math in Node and passes 11 assertions — H1 (refine.nearest == independent
+  brute-force nearest), the opacity-weighted aggregate, the spread, radius filtering, and
+  floater exclusion. Run: `cd web-page/src && node SplatPivotSource.test.mjs`.
+- **Phase 2 (measure tool): implemented, bundle builds clean, NOT yet run in the app.**
+  No display/GPU in the build shell (no X server, no `xvfb`, no sample tilesets), so the
+  overlay rendering, mesh-depth-pick path, and mode interplay are code-reviewed but not
+  runtime-exercised here.
+- **Phase 3 (app harness): written, NOT yet run.** `tools/gs-measure-verify.js` needs
+  `GS_TILESET_DIR` + a display+GPU session (same as `gs-verify.js`).
+- **Blocked on Adrian:** (1) path to a `KHR_gaussian_splatting` tileset; (2) a run of
+  `GS_TILESET_DIR=… DISPLAY=:0 node_modules/.bin/electron tools/gs-measure-verify.js` (and
+  `gs-verify.js` / `verify-snap.js` for regression) on a display machine. Real H1/H2/H3
+  numbers + timings + screenshot get folded into a dated report and the handoff doc after
+  that run.
+
 ## Explicit non-goals
 
 - GPU id+depth offscreen pre-pass (documented in handoff only).
