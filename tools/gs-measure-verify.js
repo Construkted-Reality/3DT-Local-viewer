@@ -148,6 +148,8 @@ app.whenReady().then(async () => {
         const beforeTilt=await refCount();
         await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mousePressed",x:sx,y:sy,button:"right",buttons:2,clickCount:1});
         await sleep(60);
+        // Crosshair must now show on right-drag (tilt), not just left-drag.
+        out.markerOnTilt=await wc.executeJavaScript(`window.tilesetViewer._rotationCenterSnap._markerEl.style.display==='block'`);
         for(let i=1;i<=8;i++){await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mouseMoved",x:sx+i*4,y:sy+i*3,button:"right",buttons:2});await sleep(20);}
         await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mouseReleased",x:sx+32,y:sy+24,button:"right",buttons:0,clickCount:1});
         await sleep(60);
@@ -182,12 +184,13 @@ app.whenReady().then(async () => {
                    out.h2.samples > 0 &&
                    out.h3.ok && out.h3.withinSigma &&
                    out.gating.tiltRefines > 0 && out.gating.zoomRefines === 0 &&
+                   out.markerOnTilt === true &&
                    out.overlay.aSet && out.overlay.bSet && out.overlay.svgVisible &&
                    out.errors.length===0;
         out.summary = `nearestErr=${out.h1.ok?out.h1.nearestErr:'n/a'} `+
             `delta(min/med/max)=${out.h2.minDelta}/${out.h2.medianDelta}/${out.h2.maxDelta} `+
             `H3 err=${out.h3.ok?out.h3.err:'n/a'} sigma=${out.h3.ok?out.h3.sigma:'n/a'} `+
-            `gating(tilt/zoom refines)=${out.gating.tiltRefines}/${out.gating.zoomRefines} `+
+            `gating(tilt/zoom refines)=${out.gating.tiltRefines}/${out.gating.zoomRefines} markerOnTilt=${out.markerOnTilt} `+
             `refineMs=${out.h1.ok?out.h1.refineMs:'n/a'} queryMs=${out.h1.ok?out.h1.lastQueryMs:'n/a'} `+
             `overlay=${out.overlay&&out.overlay.svgVisible} crash=${out.errors.length>0}`;
         log("RESULT", out.summary, out.PASS?"PASS":"FAIL");

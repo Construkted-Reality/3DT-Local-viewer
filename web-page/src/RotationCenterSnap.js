@@ -255,38 +255,40 @@ class RotationCenterSnap {
 
     // --- gesture wiring ------------------------------------------------------
 
-    // The marker indicates the ROTATION centre, so it's bound to plain left-drag
-    // (this app maps rotate -> LEFT_DRAG). The pivot Cesium will orbit comes from
-    // the same _resolve() the wrap uses, so the marker and the orbit centre agree.
+    // The marker indicates the rotation centre for both orbit gestures: spin (left-drag)
+    // and tilt (right-drag). The pivot comes from the same _pivotPoint() the pick wrap
+    // uses, so the marker and the orbit centre agree.
     _installGestureHandler() {
         this._handler = new ScreenSpaceEventHandler(this._scene.canvas);
 
-        // Left-drag = spin, right-drag = tilt. Set the gesture BEFORE resolving the pivot
-        // so _pivotPoint knows to refine. (Cesium's controller re-picks during the drag;
-        // the gesture is already set by then.) The marker uses _pivotPoint too, so the
-        // crosshair sits on the same refined point Cesium orbits.
-        this._handler.setInputAction((event) => {
-            this._gesture = "spin";
-            if (this._isFlyActive() || this._isMeasureActive()) return;
-            const point = this._pivotPoint(event.position);
-            if (point) {
-                this._showMarkerAt(point);
-            }
-        }, ScreenSpaceEventType.LEFT_DOWN);
+        this._handler.setInputAction(
+            (event) => this._beginGesture("spin", event.position),
+            ScreenSpaceEventType.LEFT_DOWN,
+        );
+        this._handler.setInputAction(() => this._endGesture(), ScreenSpaceEventType.LEFT_UP);
 
-        this._handler.setInputAction(() => {
-            this._gesture = null;
-            this._hideMarker();
-        }, ScreenSpaceEventType.LEFT_UP);
+        this._handler.setInputAction(
+            (event) => this._beginGesture("tilt", event.position),
+            ScreenSpaceEventType.RIGHT_DOWN,
+        );
+        this._handler.setInputAction(() => this._endGesture(), ScreenSpaceEventType.RIGHT_UP);
+    }
 
-        // Tilt (right-drag orbit) also refines its pivot, but shows no marker for now.
-        this._handler.setInputAction(() => {
-            this._gesture = "tilt";
-        }, ScreenSpaceEventType.RIGHT_DOWN);
+    // Set the gesture BEFORE resolving the pivot so _pivotPoint knows to refine (Cesium's
+    // controller re-picks during the drag; the gesture is already set by then), then show
+    // the crosshair on the resolved pivot.
+    _beginGesture(name, position) {
+        this._gesture = name;
+        if (this._isFlyActive() || this._isMeasureActive()) return;
+        const point = this._pivotPoint(position);
+        if (point) {
+            this._showMarkerAt(point);
+        }
+    }
 
-        this._handler.setInputAction(() => {
-            this._gesture = null;
-        }, ScreenSpaceEventType.RIGHT_UP);
+    _endGesture() {
+        this._gesture = null;
+        this._hideMarker();
     }
 
     // --- measurement resolution ---------------------------------------------

@@ -49,7 +49,8 @@ regardless of requestRenderMode — do not put expensive work there.
 ## Rotation-centre snapping (`RotationCenterSnap.js`)
 
 Orbit/tilt/zoom snap their pivot to the nearest tileset point under the cursor, and a
-crosshair marker shows the rotation centre during left-drag. This is done **without
+crosshair marker shows the rotation centre during an orbit drag (left = spin, right = tilt).
+This is done **without
 forking Cesium**: the stock `ScreenSpaceCameraController` derives every gesture's pivot
 from `scene.pickPositionWorldCoordinates`, so we shadow that one instance method with a
 9-sample neighbourhood search (cursor pixel + a ring at `SNAP_RADIUS_PX`) and return the
@@ -64,9 +65,10 @@ controller just rotates in place.
 - The marker is a **DOM overlay** (`_markerEl` in `viewer.container`), NOT a Cesium
   billboard. A billboard renders in the TRANSLUCENT pass (9) but Gaussian splats render
   later (GAUSSIAN_SPLATS pass 11) and paint over it, so a billboard marker is invisible on
-  splats. The DOM element sits above the canvas and shows on any content; while a left-drag
-  is active we project the fixed world pivot to the screen each `postRender` (the camera
-  orbits it). It has a dark halo so it reads on bright (over-exposed splat) backgrounds.
+  splats. The DOM element sits above the canvas and shows on any content; while an orbit
+  drag (left/right) is active we project the fixed world pivot to the screen each
+  `postRender` (the camera orbits it). It has a dark halo so it reads on bright (over-exposed
+  splat) backgrounds.
 - **Gaussian-splat tilesets** (`SplatPivotSource.js`): splats are NOT depth-pickable in
   1.142 — `pickPositionWorldCoordinates` and `scene.pick` both return nothing (they write
   no depth, carry no pick id; upstream CesiumGS/cesium#13326). So when the mesh depth-pick
