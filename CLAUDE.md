@@ -50,14 +50,25 @@ regardless of requestRenderMode — do not put expensive work there.
 
 Orbit/tilt/zoom snap their pivot to the nearest tileset point under the cursor, and a
 crosshair marker shows the rotation centre during an orbit drag (left = spin, right = tilt).
-This is done **without
-forking Cesium**: the stock `ScreenSpaceCameraController` derives every gesture's pivot
-from `scene.pickPositionWorldCoordinates`, so we shadow that one instance method with a
-9-sample neighbourhood search (cursor pixel + a ring at `SNAP_RADIUS_PX`) and return the
-hit **nearest the camera**. Nearest-to-camera (not nearest-to-cursor) is what makes a
-click through a hole in e.g. a lattice tower snap to the near member rather than the far
-background. A genuine miss returns `undefined` (no fallback — the globe is hidden), so the
-controller just rotates in place.
+This is done **without forking Cesium**: the stock `ScreenSpaceCameraController` derives
+every gesture's pivot from `scene.pickPositionWorldCoordinates`, so we shadow that one
+instance method.
+
+- **Tiered pick** (`pickTiers.js`, `PICK_POLICY` in `RotationCenterSnap.js`): try screen
+  radii from small to large, stop at the first tier that hits, **nearest-to-camera within a
+  tier** (foreground preference — a lattice member a few px away beats the far background
+  seen through a hole). The radii are tuned on **two axes**:
+  - *Operation*: **pivot** is forgiving (tier 0 is a small ring, so a closer surface just off
+    the cursor takes the rotation centre); **measurement** is precise (tier 0 is the exact
+    pixel, so a direct hit on far geometry is never stolen by a nearer thing a few px away —
+    forgiveness only expands outward on a true miss).
+  - *Tileset type*: **gs** uses wider radii than **mesh**/point-cloud (decimated splat centres
+    are sparser on screen than per-pixel depth). Mesh & point cloud share one column.
+  - Defaults: `pivot {mesh:[5,16], gs:[8,28]}`, `measure {mesh:[0,2,5], gs:[4,10,20]}` — FEEL
+    constants, tune by clicking. The measure-mode **hover preview** (`MeasureTool`, a hollow
+    ring) shows where a click would land so a bad radius is obvious before committing.
+- A genuine miss (nothing in any tier) returns `undefined` (no fallback — the globe is
+  hidden), so the controller just rotates in place.
 
 - Verified against real 1.142 with `tools/pivot-probe.js` (which gesture calls the pick,
   how often) and `tools/verify-snap.js` (the feature: near-miss snaps, far pixel doesn't,

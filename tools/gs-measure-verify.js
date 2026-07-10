@@ -163,6 +163,14 @@ app.whenReady().then(async () => {
 
         // Overlay: activate MEASURE via the tool, drive two synthetic clicks, screenshot.
         await wc.executeJavaScript(`window.tilesetViewer._measureTool.activate()`);
+
+        // Hover preview: moving over a splat pixel should show the preview ring, and the
+        // measure resolve should land at a low tier (exact-first policy) over dense splats.
+        await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mouseMoved",x:sx,y:sy});
+        await sleep(150);
+        out.preview = await wc.executeJavaScript(`(()=>{const mt=window.tilesetViewer._measureTool,sn=window.tilesetViewer._rotationCenterSnap;
+            return {visible:mt._previewEl.style.display==='block',tier:sn._lastResolveTier,source:sn._lastResolveSource};})()`);
+        log("preview", JSON.stringify(out.preview));
         const clickAt = async (px,py)=>{
             const x=Math.round(px+rect.left),y=Math.round(py+rect.top);
             await dbg.sendCommand("Input.dispatchMouseEvent",{type:"mousePressed",x,y,button:"left",buttons:1,clickCount:1});
@@ -185,12 +193,14 @@ app.whenReady().then(async () => {
                    out.h3.ok && out.h3.withinSigma &&
                    out.gating.tiltRefines > 0 && out.gating.zoomRefines === 0 &&
                    out.markerOnTilt === true &&
+                   out.preview.visible === true &&
                    out.overlay.aSet && out.overlay.bSet && out.overlay.svgVisible &&
                    out.errors.length===0;
         out.summary = `nearestErr=${out.h1.ok?out.h1.nearestErr:'n/a'} `+
             `delta(min/med/max)=${out.h2.minDelta}/${out.h2.medianDelta}/${out.h2.maxDelta} `+
             `H3 err=${out.h3.ok?out.h3.err:'n/a'} sigma=${out.h3.ok?out.h3.sigma:'n/a'} `+
             `gating(tilt/zoom refines)=${out.gating.tiltRefines}/${out.gating.zoomRefines} markerOnTilt=${out.markerOnTilt} `+
+            `preview=${out.preview&&out.preview.visible}(tier${out.preview&&out.preview.tier}) `+
             `refineMs=${out.h1.ok?out.h1.refineMs:'n/a'} queryMs=${out.h1.ok?out.h1.lastQueryMs:'n/a'} `+
             `overlay=${out.overlay&&out.overlay.svgVisible} crash=${out.errors.length>0}`;
         log("RESULT", out.summary, out.PASS?"PASS":"FAIL");

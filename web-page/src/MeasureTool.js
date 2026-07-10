@@ -22,6 +22,19 @@ import {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+// Hover preview: a hollow ring (distinct from the solid red placed dots) showing where the
+// next click would land, so a wrong snap radius is obvious before you commit. Dark halo so
+// it reads on bright splat backgrounds.
+const PREVIEW_SVG =
+    "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
+    "<circle cx='12' cy='12' r='6' fill='none' stroke='#000000' stroke-width='3.5' stroke-opacity='0.5'/>" +
+    "<circle cx='12' cy='12' r='6' fill='none' stroke='#ffffff' stroke-width='1.5'/>" +
+    "<circle cx='12' cy='12' r='1.5' fill='#ffffff'/></svg>";
+
+// Don't recompute the preview until the cursor moves at least this far — keeps the per-move
+// resolve (and, on splats, refine) from running on every sub-pixel mouse event.
+const PREVIEW_MIN_MOVE_PX = 2;
+
 class MeasureTool {
     // options: { viewer, snap: RotationCenterSnap, isFlyActive?: () => boolean }
     constructor(options) {
@@ -35,8 +48,12 @@ class MeasureTool {
         this._b = undefined; // Cartesian3
         this._spreadA = 0;
         this._spreadB = 0;
+        // A button is held (orbit/tilt drag in progress) → suppress the hover preview.
+        this._pointerDown = false;
+        this._lastPreviewPx = undefined;
 
         this._installOverlay();
+        this._installPreview();
         this._installHandler();
 
         // Reproject the fixed world endpoints each rendered frame as the camera moves.
@@ -54,6 +71,7 @@ class MeasureTool {
     deactivate() {
         this._active = false;
         this._clear();
+        this._hidePreview();
     }
 
     // --- overlay -------------------------------------------------------------
@@ -119,6 +137,17 @@ class MeasureTool {
         return g;
     }
 
+    _installPreview() {
+        const el = document.createElement("div");
+        el.className = "measure-preview";
+        el.style.cssText =
+            "position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;" +
+            "pointer-events:none;display:none;z-index:1000;";
+        el.innerHTML = PREVIEW_SVG;
+        this._viewer.container.appendChild(el);
+        this._previewEl = el;
+    }
+
     // --- input ---------------------------------------------------------------
 
     _installHandler() {
@@ -129,6 +158,48 @@ class MeasureTool {
             if (!m) return;
             this._place(m);
         }, ScreenSpaceEventType.LEFT_CLICK);
+
+        // Hover preview: show where the next click would land. Suppressed while a button is
+        // down (an orbit/tilt drag is in progress) so it doesn't flicker during navigation.
+        this._handler.setInputAction((movement) => this._onMove(movement.endPosition), ScreenSpaceEventType.MOUSE_MOVE);
+
+        const down = () => { this._pointerDown = true; this._hidePreview(); };
+        const up = () => { this._pointerDown = false; };
+        this._handler.setInputAction(down, ScreenSpaceEventType.LEFT_DOWN);
+        this._handler.setInputAction(up, ScreenSpaceEventType.LEFT_UP);
+        this._handler.setInputAction(down, ScreenSpaceEventType.RIGHT_DOWN);
+        this._handler.setInputAction(up, ScreenSpaceEventType.RIGHT_UP);
+    }
+
+    _onMove(position) {
+        if (!this._active || this._isFlyActive() || this._pointerDown) {
+            this._hidePreview();
+            return;
+        }
+        // Throttle: skip until the cursor has moved a couple of px.
+        if (this._lastPreviewPx) {
+            const dx = position.x - this._lastPreviewPx.x, dy = position.y - this._lastPreviewPx.y;
+            if (dx * dx + dy * dy < PREVIEW_MIN_MOVE_PX * PREVIEW_MIN_MOVE_PX) return;
+        }
+        this._lastPreviewPx = {x: position.x, y: position.y};
+
+        const m = this._snap.resolveMeasurement(position);
+        if (!m) {
+            this._hidePreview();
+            return;
+        }
+        const pos = this._scene.cartesianToCanvasCoordinates(m.point, scratchPreview);
+        if (pos) {
+            this._previewEl.style.left = pos.x + "px";
+            this._previewEl.style.top = pos.y + "px";
+            this._previewEl.style.display = "block";
+        } else {
+            this._hidePreview();
+        }
+    }
+
+    _hidePreview() {
+        this._previewEl.style.display = "none";
     }
 
     _place(m) {
@@ -222,5 +293,6 @@ function formatMeters(v) {
 
 const scratchA = new Cartesian2();
 const scratchB = new Cartesian2();
+const scratchPreview = new Cartesian2();
 
 export { MeasureTool };
