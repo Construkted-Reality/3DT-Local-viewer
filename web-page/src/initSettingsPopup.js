@@ -1,4 +1,5 @@
 import {Cesium3DTileset} from "./CesiumJsInc.js";
+import {getAppVersion} from "./appVersion.js";
 
 // The SSE slider runs 0..SSE_SLIDER_MAX and maps inversely to screen-space
 // error (higher slider = lower SSE = higher detail). Keep both directions in sync.
@@ -160,6 +161,8 @@ function initSettingsPopup() {
     }
 
     initPerformanceReadout();
+
+    getAppVersion().then((version) => jQuery('#app-version-value').text(version));
 }
 
 // GPU frame time comes from a WebGL2 timer query. The extension is a draft one,

@@ -8,6 +8,8 @@
 //   B. a stream of rendered frames gives a frame rate, a CPU frame time and,
 //      when the driver allows the timer query, a GPU frame time.
 //   C. an idle scene returns the values to "idle".
+//   D. the panel shows the version of the running app, which the renderer reads
+//      from the main process over IPC.
 //
 // The GPU value needs the WebGL2 extension EXT_disjoint_timer_query_webgl2.
 // The script reports whether this Electron build and this driver give it.
@@ -124,6 +126,14 @@ app.whenReady().then(async () => {
         results.idleAfter = await readValues();
         log("idle after", JSON.stringify(results.idleAfter));
 
+        // D. the version label. It must match the main process, not a bundled
+        // copy of package.json, and it must never read "unknown".
+        results.version = {
+            shown: await wc.executeJavaScript(`(document.getElementById('app-version-value')||{}).textContent`),
+            expected: app.getVersion(),
+        };
+        log("version", JSON.stringify(results.version));
+
         const fpsText = results.underLoad.fps || "";
         const msText = results.underLoad.frameMs || "";
         const gpuText = (results.underLoad.gpuMs || "").trim();
@@ -147,7 +157,8 @@ app.whenReady().then(async () => {
             /ms$/.test(msText.trim()) && frameMs > 0 &&
             gpuOk &&
             results.idleAfter.fps === "idle" &&
-            results.idleAfter.frameMs === "idle";
+            results.idleAfter.frameMs === "idle" &&
+            results.version.shown === results.version.expected;
 
         log("RESULTS", JSON.stringify(results, null, 2));
         log(results.PASS ? "PASS" : "FAIL");

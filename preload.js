@@ -24,4 +24,5 @@ contextBridge.exposeInMainWorld("api", {
     selectTileset: () => ipcRenderer.send("select-3d-tile-folder"),
     selectRightTileset: () => ipcRenderer.send("select-3d-tile-folder-right"),
     notifyTilesetLoadError: () => ipcRenderer.send("tileset-load-error"),
+    getAppVersion: () => ipcRenderer.invoke("app-version"),
 });

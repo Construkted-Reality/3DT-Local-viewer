@@ -91,6 +91,10 @@ ipcMain.on('window-close', () => {
     if (mainWindow) mainWindow.close();
 });
 
+// The settings panel shows this value. app.getVersion() reads the version of
+// the running app, so a stale renderer bundle cannot report an old version.
+ipcMain.handle('app-version', () => app.getVersion());
+
 ipcMain.handle('window-is-maximized', () => {
     return mainWindow ? mainWindow.isMaximized() : false;
 });
