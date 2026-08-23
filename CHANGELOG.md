@@ -8,9 +8,11 @@
 - Settings: "Performance" block showing the frame rate, the CPU frame time and the GPU frame time. The frame rate counts the frames that CesiumJS really draws. The CPU frame time is the main-thread work between `scene.preRender` and `scene.postRender`. The GPU frame time is a WebGL2 `EXT_disjoint_timer_query_webgl2` TIME_ELAPSED query around the same span. All three read "idle" when the scene draws nothing, which is the normal state of `requestRenderMode`.
 - `tools/msaa-verify.js` and `tools/perf-readout-verify.js`: scripted checks that drive the real app.
 - `web-page/src/formatPerfWindow.test.mjs`: unit tests for the readout formats and for the timer-query state machine.
+- Settings: the version of the running app at the bottom of the panel. The renderer asks the main process for `app.getVersion()` over IPC, so a renderer bundle that nobody rebuilt cannot show an old version.
 
 #### Changed
 
+- `web-page/src/config.js` is replaced by `web-page/src/appVersion.js`. The old module read the version from `web-page/package.json`, which carries its own version for the bundle build. It therefore reported 1.0.4 in the console, not the version of the app.
 - The main process passes `--enable-webgl-draft-extensions`. Chromium hides `EXT_disjoint_timer_query_webgl2` without it, and the GPU frame time needs that extension. If the extension is still missing, the row reads "not available".
 
 ### 1.5.0 - 2026-06-29

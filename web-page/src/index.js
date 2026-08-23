@@ -1,10 +1,10 @@
-import {config} from "./config.js"
+import {getAppVersion} from "./appVersion.js"
 import {overrideCesiumCamera} from "./overrideCesiumCamera";
 import {TilesetViewer} from "./TilesetViewer";
 import {initSidebar} from "./initSidebar";
 import {initSettingsPopup} from "./initSettingsPopup";
 
-console.log('TG Local viewer version', config.version);
+getAppVersion().then((version) => console.log('TG Local viewer version', version));
 
 initSidebar();
 overrideCesiumCamera();

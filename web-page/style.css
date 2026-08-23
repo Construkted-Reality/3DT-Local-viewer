@@ -389,3 +389,7 @@ popups
     font-variant-numeric: tabular-nums;
     font-weight: bold;
 }
+
+.bst4-wrapper p.desc.app-version {
+    text-align: right;
+}
