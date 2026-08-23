@@ -1,10 +1,34 @@
 # Change Log
 
-### Unreleased
+### 1.6.0 - 2026-08-23
+
+#### Added
+
+- Settings: "Multisampling (MSAA)" selector with Off (1 sample), Half (2 samples) and Full (4 samples). It writes `scene.msaaSamples`. If the WebGL context reports no multisampling support, the control is disabled and reads Off.
+- Settings: "Performance" block showing the frame rate, the CPU frame time and the GPU frame time. The frame rate counts the frames that CesiumJS really draws. The CPU frame time is the main-thread work between `scene.preRender` and `scene.postRender`. The GPU frame time is a WebGL2 `EXT_disjoint_timer_query_webgl2` TIME_ELAPSED query around the same span. All three read "idle" when the scene draws nothing, which is the normal state of `requestRenderMode`.
+- `tools/msaa-verify.js` and `tools/perf-readout-verify.js`: scripted checks that drive the real app.
+- `web-page/src/formatPerfWindow.test.mjs`: unit tests for the readout formats and for the timer-query state machine.
+
+#### Changed
+
+- The main process passes `--enable-webgl-draft-extensions`. Chromium hides `EXT_disjoint_timer_query_webgl2` without it, and the GPU frame time needs that extension. If the extension is still missing, the row reads "not available".
+
+### 1.5.0 - 2026-06-29
+
+#### Added
+
+- Rotation-centre snapping: orbit, tilt and zoom move the pivot to the nearest tileset point under the cursor, and a crosshair marker shows the rotation centre during a left drag. Gaussian-splat tilesets fall back to the nearest splat centre, because splats write no depth in CesiumJS 1.142.
 
 #### Changed
 
 - Upgraded bundled CesiumJS from 1.140 to 1.142.
+- The viewer runs in `requestRenderMode`. It draws a frame only when the scene changes, which lowers idle GPU and CPU use by about 92 percent.
+
+#### Fixed
+
+- Camera: `validPitch` clamps in signed radians.
+- Server: `startServer` reports a bind error instead of failing silently, and the gzip check resolves against the served directory.
+- Security: the main process blocks navigation away from the bundled page and the renderer runs sandboxed.
 
 ### 1.4.0 - 2026-05-31
 
