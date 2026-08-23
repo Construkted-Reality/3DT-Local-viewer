@@ -1,5 +1,11 @@
 # Change Log
 
+### Unreleased
+
+#### Changed
+
+- Settings: the anti-aliasing checkbox is now named "Anti-Aliasing (FXAA)". The old name was ambiguous, because the panel also has a multisampling control and multisampling is anti-aliasing too. The checkbox controls the post-process filter `scene.postProcessStages.fxaa`. The selector controls `scene.msaaSamples`. The two are independent.
+
 ### 1.7.0 - 2026-08-23
 
 #### Added
