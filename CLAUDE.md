@@ -42,6 +42,7 @@ Existing explicit `requestRender()` calls (keep this list current if you add mor
 - `TilesetViewer.js` `_buildCompareSlider` — compare-slider drag
 - `initSettingsPopup.js` — every settings handler (SSE, skip-LOD, cache, wireframe, bbox, FXAA)
 - `RotationCenterSnap.js` — rotation-centre marker show/hide
+- `DynamicMsaa.js` — the restore of the sample count after the camera stops
 
 Per-frame `scene.preUpdate`/`scene.postUpdate` listeners still fire every animation frame
 regardless of requestRenderMode — do not put expensive work there. `scene.preRender`/
@@ -56,6 +57,32 @@ That readout shows two different times. **CPU frame time** is the wall time betw
 reports GPU_DISJOINT. Chromium only exposes that extension because `index.js` passes
 `--enable-webgl-draft-extensions`; without it the row reads `not available`. Unit tests for
 both formats and the query state machine: `web-page/src/formatPerfWindow.test.mjs`.
+
+## Dynamic multisampling (`DynamicMsaa.js`)
+
+`scene.msaaSamples` follows the camera: 1 sample while the camera moves, the sample count
+from the settings selector after the camera holds still for `IDLE_MS` (250 ms). The settings
+toggle is "Multisampling Only When The Camera Stops" (`#msaa-dynamic-checkbox`, on at start).
+This works because of requestRenderMode: an idle scene draws no frame, so multisampling costs
+nothing at rest, and nearly every drawn frame is a frame that the camera moves through.
+
+Two facts drive the design:
+
+- A movement is only visible on a drawn frame, so `scene.preRender` watches the camera. A
+  write to `msaaSamples` there reaches the same frame, so the first moved frame already draws
+  at 1 sample.
+- A stop is the absence of a frame, and no event reports it. A timer finds it. The restore
+  must call `scene.requestRender()`, because nothing else asks for that frame.
+
+**CAUTION:** a change of `scene.msaaSamples` makes CesiumJS destroy and rebuild the scene
+framebuffer on the next drawn frame (`FramebufferManager.isDirty` → `destroy` → a new Texture
+and a new multisample Renderbuffer at the canvas size). One transition costs one allocation.
+`IDLE_MS` keeps a burst of wheel events from paying that cost many times, and `_apply` writes
+the property only when the value really changes. `tools/dynamic-msaa-verify.js` measures the
+real cost of a transition and the GPU time that the feature saves during a drag.
+
+The selector no longer writes `scene.msaaSamples`. `DynamicMsaa` owns it. Anything that wants
+to change the sample count must go through `setTargetSamples`.
 
 ## Rotation-centre snapping (`RotationCenterSnap.js`)
 

@@ -1,5 +1,18 @@
 # Change Log
 
+### Unreleased
+
+#### Added
+
+- Settings: a "Multisampling Only When The Camera Stops" toggle. It turns multisampling off while the camera moves and back on after the camera holds still for 250 ms. Multisampling costs GPU time on every drawn frame, and the scene draws frames mostly while the camera moves, so this puts the cost where the user does not feel it. The toggle is on at start and it does nothing while the Multisampling selector reads Off.
+- `web-page/src/DynamicMsaa.js`: the logic of that toggle. It watches the camera on each drawn frame and it uses a timer to find the stop, because a stopped camera draws no frame and raises no event.
+- `web-page/src/DynamicMsaa.test.mjs`: a headless test that drives the logic with a fake scene and a fake timer.
+- `tools/dynamic-msaa-verify.js`: a harness that drives the real app. It drags the camera with the toggle on and with the toggle off, checks the sample count of every drawn frame, and measures the GPU time and the CPU time of a drag frame in both states. It also reports the time of each frame that changes the sample count, because that frame rebuilds the scene framebuffer.
+
+#### Changed
+
+- The Multisampling selector no longer writes `scene.msaaSamples` itself. `DynamicMsaa` owns that property and the selector gives it the wanted sample count. With the new toggle off, the selector behaves as before.
+
 ### 1.8.0 - 2026-08-23
 
 #### Added
