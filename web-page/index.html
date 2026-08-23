@@ -88,6 +88,26 @@
                                 </div>
                             </div>
 
+                            <div class="form-group">
+                                <label><strong>Performance</strong></label>
+                                <div class="perf-row">
+                                    <span>Frame rate</span>
+                                    <span id="perf-fps-value" class="perf-value">idle</span>
+                                </div>
+                                <div class="perf-row">
+                                    <span>CPU frame time</span>
+                                    <span id="perf-frame-ms-value" class="perf-value">idle</span>
+                                </div>
+                                <div class="perf-row">
+                                    <span>GPU frame time</span>
+                                    <span id="perf-gpu-ms-value" class="perf-value">idle</span>
+                                </div>
+                                <p class="desc">The viewer draws a frame only when the scene changes. The values show
+                                    "idle" when nothing moves. The CPU frame time is the time that the main thread
+                                    needs to build and send one frame. The GPU frame time is the time that the graphics
+                                    card needs to draw it. The two overlap, so do not add them.</p>
+                            </div>
+
                             <hr style="width:100%;text-align:left;margin-left:0">
 
                             <div class="form-group">
@@ -114,6 +134,16 @@
                                 <label class="form-check-label" for="fxaa-enable-checkbox">
                                     Anti-Aliasing
                                 </label>
+                            </div>
+
+                            <div class="form-group" style="margin-top:0.5rem">
+                                <label for="msaa-samples-select">Multisampling (MSAA)</label>
+                                <select id="msaa-samples-select" class="form-control" style="width:auto">
+                                    <option value="1">Off</option>
+                                    <option value="2">Half</option>
+                                    <option value="4">Full</option>
+                                </select>
+                                <p class="desc">Smooths edges in the scene. Higher settings cost more GPU time.</p>
                             </div>
 
                             <div class="form-check">
