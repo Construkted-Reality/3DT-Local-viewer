@@ -4,6 +4,7 @@
 
 #### Changed
 
+- Multisampling is off by default. CesiumJS uses 4 samples, which costs GPU memory and GPU time on every drawn frame. The Multisampling control in the settings panel turns it on, and the control shows the real state at start.
 - Settings: the anti-aliasing checkbox is now named "Anti-Aliasing (FXAA)". The old name was ambiguous, because the panel also has a multisampling control and multisampling is anti-aliasing too. The checkbox controls the post-process filter `scene.postProcessStages.fxaa`. The selector controls `scene.msaaSamples`. The two are independent.
 
 ### 1.7.0 - 2026-08-23
