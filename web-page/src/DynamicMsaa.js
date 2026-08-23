@@ -55,7 +55,14 @@ class DynamicMsaa {
 
         this._scene = scene;
         this._idleMs = options.idleMs === undefined ? IDLE_MS : options.idleMs;
-        this._timers = options.timers || {setTimeout: setTimeout, clearTimeout: clearTimeout};
+        // CAUTION: keep the two arrow functions. A browser rejects
+        // window.setTimeout when another object calls it ("TypeError: Illegal
+        // invocation"), so {setTimeout: setTimeout} in a plain object breaks in
+        // the app and passes in node, which does not check the receiver.
+        const timers = options.timers || {};
+
+        this._setTimeout = timers.setTimeout || ((fn, ms) => setTimeout(fn, ms));
+        this._clearTimeout = timers.clearTimeout || ((id) => clearTimeout(id));
 
         this._enabled = false;
         this._targetSamples = scene.msaaSamples;
@@ -97,7 +104,7 @@ class DynamicMsaa {
     _restartIdleTimer() {
         this._cancelIdleTimer();
 
-        this._timer = this._timers.setTimeout(() => {
+        this._timer = this._setTimeout(() => {
             this._timer = null;
             this._moving = false;
             this._apply();
@@ -110,7 +117,7 @@ class DynamicMsaa {
 
     _cancelIdleTimer() {
         if (this._timer !== null) {
-            this._timers.clearTimeout(this._timer);
+            this._clearTimeout(this._timer);
             this._timer = null;
         }
     }

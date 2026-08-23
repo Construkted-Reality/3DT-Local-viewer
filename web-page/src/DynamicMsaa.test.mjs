@@ -174,5 +174,36 @@ function setup(targetSamples, enabled) {
     check("the feature off cancels the timer", timers.count() === 0);
 }
 
+// --- 8. the default timers call the global function, not a method of an object
+// A browser throws "TypeError: Illegal invocation" when an object other than
+// the window calls window.setTimeout. Node does not check the receiver, so this
+// test checks it here: it replaces the global with a strict-mode function that
+// records its receiver. A plain call leaves the receiver undefined.
+{
+    const realSetTimeout = globalThis.setTimeout;
+    const realClearTimeout = globalThis.clearTimeout;
+    let receiver = "not called";
+
+    globalThis.setTimeout = function (fn, ms) { receiver = this; return 1; };
+    globalThis.clearTimeout = function () {};
+
+    try {
+        const scene = makeScene();
+        const msaa = new DynamicMsaa({scene}); // no timers, so the defaults run
+
+        scene.frame();
+        msaa.setTargetSamples(4);
+        msaa.setEnabled(true);
+        scene.move(10);
+        scene.frame();
+
+        check("the default timer calls the global setTimeout plainly",
+            receiver === undefined || receiver === globalThis, `receiver was ${typeof receiver}`);
+    } finally {
+        globalThis.setTimeout = realSetTimeout;
+        globalThis.clearTimeout = realClearTimeout;
+    }
+}
+
 console.log(failures === 0 ? "\nall tests passed" : `\n${failures} test(s) failed`);
 process.exit(failures === 0 ? 0 : 1);
