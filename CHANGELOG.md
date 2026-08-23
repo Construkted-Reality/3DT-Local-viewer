@@ -1,11 +1,16 @@
 # Change Log
 
-### Unreleased
+### 1.8.0 - 2026-08-23
+
+#### Added
+
+- `.github/workflows/release.yml`: a GitHub Actions workflow that builds the Linux and the Windows package and publishes them on a GitHub release. Push a tag that starts with "v" to run it. The workflow builds the renderer bundle first, because electron-forge does not build it and git does not carry it. The release notes come from the section of this file for that version.
 
 #### Changed
 
 - Multisampling is off by default. CesiumJS uses 4 samples, which costs GPU memory and GPU time on every drawn frame. The Multisampling control in the settings panel turns it on, and the control shows the real state at start.
 - Settings: the anti-aliasing checkbox is now named "Anti-Aliasing (FXAA)". The old name was ambiguous, because the panel also has a multisampling control and multisampling is anti-aliasing too. The checkbox controls the post-process filter `scene.postProcessStages.fxaa`. The selector controls `scene.msaaSamples`. The two are independent.
+- The packaged app no longer carries `docs`, `tools`, `.github` or the dependencies of the renderer build. The packager ignores them.
 
 ### 1.7.0 - 2026-08-23
 
