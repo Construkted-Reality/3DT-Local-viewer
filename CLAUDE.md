@@ -49,6 +49,14 @@ regardless of requestRenderMode — do not put expensive work there. `scene.preR
 which is what the settings-panel FPS readout counts (`initPerformanceReadout` in
 `initSettingsPopup.js`). An idle scene draws nothing, so that readout shows `idle`, not `0 fps`.
 
+That readout shows two different times. **CPU frame time** is the wall time between
+`preRender` and `postRender` (main-thread work only). **GPU frame time** is a real
+`EXT_disjoint_timer_query_webgl2` TIME_ELAPSED query wrapped around the same span
+(`createGpuTimer`); results arrive a few frames late and are discarded when the driver
+reports GPU_DISJOINT. Chromium only exposes that extension because `index.js` passes
+`--enable-webgl-draft-extensions`; without it the row reads `not available`. Unit tests for
+both formats and the query state machine: `web-page/src/formatPerfWindow.test.mjs`.
+
 ## Rotation-centre snapping (`RotationCenterSnap.js`)
 
 Orbit/tilt/zoom snap their pivot to the nearest tileset point under the cursor, and a

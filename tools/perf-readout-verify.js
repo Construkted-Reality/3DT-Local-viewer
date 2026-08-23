@@ -4,9 +4,13 @@
 
 // Verification for the performance readout in the settings panel, against the
 // REAL app bundle. Launches the renderer, opens the settings panel, then checks:
-//   A. both value elements exist and start at "idle".
-//   B. a stream of rendered frames gives a frame rate and a frame time.
-//   C. an idle scene returns both values to "idle".
+//   A. all three value elements exist and start at "idle".
+//   B. a stream of rendered frames gives a frame rate, a CPU frame time and,
+//      when the driver allows the timer query, a GPU frame time.
+//   C. an idle scene returns the values to "idle".
+//
+// The GPU value needs the WebGL2 extension EXT_disjoint_timer_query_webgl2.
+// The script reports whether this Electron build and this driver give it.
 //
 // Run:  DISPLAY=:0 node_modules/.bin/electron tools/perf-readout-verify.js
 
@@ -22,6 +26,8 @@ const SETTLE_MS = 3000;
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function log(...a) { console.log("[perf-readout]", ...a); }
 
+// Same switch as index.js: Chromium hides the timer-query extension without it.
+app.commandLine.appendSwitch("enable-webgl-draft-extensions");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 
@@ -67,11 +73,25 @@ app.whenReady().then(async () => {
             panelVisible: jQuery('#construkted-popup-settings').is(':visible'),
             fps: (document.getElementById('perf-fps-value')||{}).textContent,
             frameMs: (document.getElementById('perf-frame-ms-value')||{}).textContent,
+            gpuMs: (document.getElementById('perf-gpu-ms-value')||{}).textContent,
         }))()`);
 
         results.elementsExist = await wc.executeJavaScript(`(()=>(
-            !!document.getElementById('perf-fps-value') && !!document.getElementById('perf-frame-ms-value')
+            !!document.getElementById('perf-fps-value') &&
+            !!document.getElementById('perf-frame-ms-value') &&
+            !!document.getElementById('perf-gpu-ms-value')
         ))()`);
+
+        // Does this build give the timer-query extension at all?
+        results.gpuTimerSupported = await wc.executeJavaScript(`(()=>{
+            const gl = window.tilesetViewer.viewer.scene.canvas.getContext('webgl2');
+            return !!(gl && gl.getExtension('EXT_disjoint_timer_query_webgl2'));
+        })()`);
+        results.webglVersion = await wc.executeJavaScript(`(()=>{
+            const c = window.tilesetViewer.viewer.scene.canvas;
+            return c.getContext('webgl2') ? 'webgl2' : 'webgl1-or-none';
+        })()`);
+        log("gpu timer supported:", results.gpuTimerSupported, "|", results.webglVersion);
 
         // A. an untouched scene renders nothing, so both values read "idle".
         await sleep(1200);
@@ -106,16 +126,26 @@ app.whenReady().then(async () => {
 
         const fpsText = results.underLoad.fps || "";
         const msText = results.underLoad.frameMs || "";
+        const gpuText = (results.underLoad.gpuMs || "").trim();
         const fps = parseFloat(fpsText);
         const frameMs = parseFloat(msText);
+        const gpuMs = parseFloat(gpuText);
 
-        results.parsed = {fps, frameMs};
+        // The GPU row is only judged when the extension exists. Without it the
+        // row must say so, instead of showing a wrong number.
+        const gpuOk = results.gpuTimerSupported
+            ? (/ms$/.test(gpuText) && gpuMs > 0)
+            : gpuText === "not available";
+
+        results.parsed = {fps, frameMs, gpuMs};
+        results.gpuOk = gpuOk;
         results.PASS =
             results.elementsExist === true &&
             results.underLoad.panelVisible === true &&
             results.idleBefore.fps === "idle" &&
             /fps$/.test(fpsText.trim()) && fps > 0 &&
             /ms$/.test(msText.trim()) && frameMs > 0 &&
+            gpuOk &&
             results.idleAfter.fps === "idle" &&
             results.idleAfter.frameMs === "idle";
 

@@ -95,12 +95,17 @@
                                     <span id="perf-fps-value" class="perf-value">idle</span>
                                 </div>
                                 <div class="perf-row">
-                                    <span>Frame time</span>
+                                    <span>CPU frame time</span>
                                     <span id="perf-frame-ms-value" class="perf-value">idle</span>
                                 </div>
-                                <p class="desc">The viewer draws a frame only when the scene changes. Both values show
-                                    "idle" when nothing moves. The frame time is the time that the CPU needs to draw one
-                                    frame. It does not include the time that the GPU needs.</p>
+                                <div class="perf-row">
+                                    <span>GPU frame time</span>
+                                    <span id="perf-gpu-ms-value" class="perf-value">idle</span>
+                                </div>
+                                <p class="desc">The viewer draws a frame only when the scene changes. The values show
+                                    "idle" when nothing moves. The CPU frame time is the time that the main thread
+                                    needs to build and send one frame. The GPU frame time is the time that the graphics
+                                    card needs to draw it. The two overlap, so do not add them.</p>
                             </div>
 
                             <hr style="width:100%;text-align:left;margin-left:0">

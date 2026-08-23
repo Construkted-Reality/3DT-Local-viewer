@@ -162,6 +162,93 @@ function initSettingsPopup() {
     initPerformanceReadout();
 }
 
+// GPU frame time comes from a WebGL2 timer query. The extension is a draft one,
+// so Chromium exposes it only when the main process passes
+// --enable-webgl-draft-extensions (see index.js). A driver can still refuse it.
+const GPU_TIMER_EXTENSION = 'EXT_disjoint_timer_query_webgl2';
+
+// Wraps one TIME_ELAPSED query around each drawn frame. The GPU answers a few
+// frames late, so begin/end only queue the work and collect() reads whatever
+// finished since the last call. Returns null when the extension is missing.
+//
+// Two rules of the extension drive this code:
+//   1. Only one TIME_ELAPSED query can be active on a context at a time.
+//   2. A "disjoint" period means the GPU changed context and every result in
+//      that period is wrong. Throw those results away.
+function createGpuTimer(scene) {
+    const canvas = scene.canvas;
+    const gl = canvas && typeof canvas.getContext === 'function' ? canvas.getContext('webgl2') : null;
+    const ext = gl ? gl.getExtension(GPU_TIMER_EXTENSION) : null;
+
+    if (!ext)
+        return null;
+
+    let active = null;
+    let pending = [];
+
+    return {
+        begin() {
+            if (active)
+                return;
+
+            const query = gl.createQuery();
+
+            gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+            active = query;
+        },
+
+        end() {
+            if (!active)
+                return;
+
+            gl.endQuery(ext.TIME_ELAPSED_EXT);
+            pending.push(active);
+            active = null;
+        },
+
+        // Mean of the results that finished since the last call, in
+        // milliseconds, or null when nothing finished.
+        collect() {
+            const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
+            const stillPending = [];
+            let total = 0;
+            let count = 0;
+
+            for (const query of pending) {
+                if (!gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE)) {
+                    stillPending.push(query);
+                    continue;
+                }
+
+                if (!disjoint) {
+                    total += gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6;
+                    count += 1;
+                }
+
+                gl.deleteQuery(query);
+            }
+
+            pending = stillPending;
+
+            return count > 0 ? total / count : null;
+        },
+    };
+}
+
+// Formats the GPU value. Exported for the unit test.
+function formatGpuWindow(frames, meanMs, supported) {
+    if (!supported)
+        return 'not available';
+
+    if (frames <= 0)
+        return 'idle';
+
+    if (meanMs === null || meanMs === undefined)
+        return 'measuring';
+
+    return meanMs.toFixed(1) + ' ms';
+}
+
 // Formats one measurement window for the readout. A window with no drawn frame
 // reads "idle", which is the normal state of a scene that nothing changes.
 // Exported for the unit test.
@@ -186,18 +273,27 @@ function formatPerfWindow(frames, totalMs, elapsedMs) {
 function initPerformanceReadout() {
     const fpsEl = jQuery('#perf-fps-value');
     const frameMsEl = jQuery('#perf-frame-ms-value');
+    const gpuMsEl = jQuery('#perf-gpu-ms-value');
     const popup = jQuery('#construkted-popup-settings');
     const scene = window.tilesetViewer.viewer.scene;
+    const gpuTimer = createGpuTimer(scene);
 
     let frameStart = 0;
     let frames = 0;
     let totalMs = 0;
+    let lastGpuMs = null;
 
     scene.preRender.addEventListener(function () {
         frameStart = performance.now();
+
+        if (gpuTimer)
+            gpuTimer.begin();
     });
 
     scene.postRender.addEventListener(function () {
+        if (gpuTimer)
+            gpuTimer.end();
+
         totalMs += performance.now() - frameStart;
         frames += 1;
     });
@@ -212,10 +308,16 @@ function initPerformanceReadout() {
         const elapsed = now - windowStart;
         const framesInWindow = frames;
         const msInWindow = totalMs;
+        const gpuSample = gpuTimer ? gpuTimer.collect() : null;
 
         windowStart = now;
         frames = 0;
         totalMs = 0;
+
+        // A query can arrive after its window closes, so keep the last result
+        // and show it until a newer one arrives.
+        if (gpuSample !== null)
+            lastGpuMs = gpuSample;
 
         if (!popup.is(':visible'))
             return;
@@ -224,7 +326,8 @@ function initPerformanceReadout() {
 
         fpsEl.text(text.fps);
         frameMsEl.text(text.frameMs);
+        gpuMsEl.text(formatGpuWindow(framesInWindow, lastGpuMs, gpuTimer !== null));
     }, PERF_WINDOW_MS);
 }
 
-export {initSettingsPopup, formatPerfWindow}
+export {initSettingsPopup, formatPerfWindow, formatGpuWindow, createGpuTimer}
