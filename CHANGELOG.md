@@ -1,18 +1,20 @@
 # Change Log
 
-### Unreleased
+### 1.9.0 - 2026-08-23
 
 #### Added
 
 - Settings: a "Multisampling Only When The Camera Stops" toggle. It turns multisampling off while the camera moves and back on when the camera stops. Multisampling costs GPU time on every drawn frame, and the scene draws frames mostly while the camera moves, so this puts the cost where the user does not feel it. The toggle is on at start and it does nothing while the Multisampling selector reads Off.
-- `web-page/src/DynamicMsaa.js`: the logic of that toggle. It follows the `camera.moveStart` and `camera.moveEnd` events of CesiumJS, which report a movement that CesiumJS itself accepts. CesiumJS raises `moveEnd` 500 ms after the last change of the camera, so the sharp image follows the stop by that time.
-- `web-page/src/DynamicMsaa.test.mjs`: a headless test that drives the logic with a fake scene.
-- `tools/dynamic-msaa-probe.js`: an instrument that prints the sample count and the state of the feature for each drawn frame. It needs no tileset and no GPU, so it runs on any machine.
+- `web-page/src/DynamicMsaa.js`: the logic of that toggle. It compares the camera with a reference of its own on every animation frame, at a relative epsilon of 1e-9, and calls the camera stopped after 250 ms with no change beyond that epsilon.
+- `web-page/src/DynamicMsaa.test.mjs`: a headless test that drives the logic with a fake scene and a fake clock. It replays the renormalization drift for 600 frames and asserts that the sample count stays put.
+- `tools/dynamic-msaa-probe.js`: an instrument that judges the feature on the drawn pixels. It counts the blended edge pixels of a white box and asserts hard edges while the camera moves and smooth edges at rest. It needs no tileset and no GPU, so it runs on any machine with a display.
 - `tools/dynamic-msaa-verify.js`: a harness that drives the real app. It drags the camera with the toggle on and with the toggle off, checks the sample count of every drawn frame, and measures the GPU time and the CPU time of a drag frame in both states. It also reports the time of each frame that changes the sample count, because that frame rebuilds the scene framebuffer.
 
 #### Changed
 
 - The Multisampling selector no longer writes `scene.msaaSamples` itself. `DynamicMsaa` owns that property and the selector gives it the wanted sample count. With the new toggle off, the selector behaves as before.
+- Multisampling is Full (4 samples) at start again. 1.8.0 turned it off because it costs GPU time on every drawn frame; with the toggle above, a still scene draws no frame at all, so the smooth edges of the still view are free and the moving view pays 1 sample.
+- The movement signal is no longer `camera.moveStart` and `camera.moveEnd`. Against a real tileset CesiumJS never raises `moveEnd`: it compares the camera with a clone that it re-takes on each difference, and the renormalization of the camera vectors (about 3e-16 per frame) accumulates against that clone and crosses its epsilon of 1e-15 about every twelfth frame. Each crossing pushes the quiet timer forward, so the 500 ms that `moveEnd` waits for never arrive. The sample count stayed at 1, and `cameraChanged` drew a frame every tick on a scene that nobody touched. The comparison here uses an epsilon nine orders of magnitude above that drift and a reference that follows every real movement.
 
 ### 1.8.0 - 2026-08-23
 

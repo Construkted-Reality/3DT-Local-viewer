@@ -42,7 +42,7 @@ Existing explicit `requestRender()` calls (keep this list current if you add mor
 - `TilesetViewer.js` `_buildCompareSlider` — compare-slider drag
 - `initSettingsPopup.js` — every settings handler (SSE, skip-LOD, cache, wireframe, bbox, FXAA)
 - `RotationCenterSnap.js` — rotation-centre marker show/hide
-- `DynamicMsaa.js` — the restore of the sample count on `camera.moveEnd`
+- `DynamicMsaa.js` — the restore of the sample count when the camera stops
 
 Per-frame `scene.preUpdate`/`scene.postUpdate` listeners still fire every animation frame
 regardless of requestRenderMode — do not put expensive work there. `scene.preRender`/
@@ -66,33 +66,54 @@ The Camera Stops" (`#msaa-dynamic-checkbox`, on at start). This works because of
 requestRenderMode: an idle scene draws no frame, so multisampling costs nothing at rest, and
 nearly every drawn frame is a frame that the camera moves through.
 
-The movement signal is **Cesium's own**: `camera.moveStart` and `camera.moveEnd`.
-`View.checkForCameraUpdates` runs on every animation frame, before Cesium decides to draw. It
-compares the camera with a clone at a relative epsilon of 1e-15, raises `moveStart` on the
-first difference, and raises `moveEnd` after `scene.cameraEventWaitTime` (500 ms) with no
-difference. Both events reach us even when the scene draws nothing, which is what the restore
-needs. `moveStart` runs before the frame is built, so the first frame of the movement already
-draws at 1 sample. `moveEnd` must call `scene.requestRender()`, because nothing else asks for
-the frame that shows the smooth edges.
+The movement signal is **our own comparison**, in `DynamicMsaa._check`, on `scene.preUpdate`:
+the camera is compared with a reference that the class keeps, at a **tolerant** epsilon
+(`MOVE_EPSILON` = 1e-9), and the camera counts as stopped after `QUIET_MS` (250 ms) with no
+change beyond that. `preUpdate` runs on every animation frame, before Cesium decides to draw,
+so a still scene (which draws nothing) is still checked, and the first frame of a movement
+already draws at 1 sample. The restore must call `scene.requestRender()`, because nothing else
+asks for the frame that shows the smooth edges.
 
-**CAUTION:** do NOT go back to comparing `camera.position` and `camera.direction` on each
-drawn frame. That was the first implementation and it failed in the app: CesiumJS renormalizes
-the camera vectors every frame, so `camera.direction.y` drifted by about 3e-16 per frame with
-no input from the user. An exact comparison reads that drift as movement, re-arms the restore
-for ever, and the sample count never comes back. `tools/dynamic-msaa-probe.js` shows the drift.
+**CAUTION — the drift, and why it defeated two earlier implementations.** CesiumJS renormalizes
+the camera vectors on every frame, which moves their last bits by about 3e-16 with no input
+from the user. Both earlier designs died on it:
+
+1. *Exact comparison per drawn frame.* Reads the drift as movement directly, re-arms the
+   restore for ever, sample count never comes back.
+2. *Cesium's `camera.moveStart` / `camera.moveEnd`.* Looks immune, is not.
+   `View.checkForCameraUpdates` compares the camera with a clone **that it re-takes on each
+   difference**, so the drift ACCUMULATES against that clone and crosses its relative epsilon
+   of 1e-15 about every twelfth frame. Each crossing pushes `_cameraMovedTime` forward, so the
+   500 ms of quiet that `moveEnd` needs never arrives. Measured in the app against a real
+   tileset, camera untouched: `direction` differed from the clone on 5 frames of 60, with
+   `_cameraStartFired=true` and `since=50ms` against `wait=500ms`. `moveEnd` was unreachable,
+   the sample count stayed at 1, and `cameraChanged` drew a frame every tick — a busy GPU and
+   20 fps on a scene nobody was touching. Note this also latches `moveStart` on, so it never
+   fires again either: the START is as unreliable as the stop.
+
+So: comparing per frame is **correct**, comparing exactly is not. The cure is the epsilon. The
+drift accumulates to about 1e-14 over a quiet period; the smallest real camera movement changes
+a direction component by about 1e-5. `MOVE_EPSILON` = 1e-9 sits in that nine-order gap. The
+reference is also re-taken on every real movement, so drift can never accumulate against a
+stale snapshot. `DynamicMsaa.test.mjs` replays 600 frames of the measured drift and asserts
+that the sample count does not move.
 
 **CAUTION:** a change of `scene.msaaSamples` makes CesiumJS destroy and rebuild the scene
 framebuffer on the next drawn frame (`FramebufferManager.isDirty` → `destroy` → a new Texture
 and a new multisample Renderbuffer at the canvas size). One gesture costs two of those
-rebuilds, because `moveStart` and `moveEnd` each fire one time for each burst of movement.
+rebuilds, one at the start of the movement and one at the stop.
 `tools/dynamic-msaa-verify.js` measures that cost and the GPU time that the feature saves.
 
 The selector no longer writes `scene.msaaSamples`. `DynamicMsaa` owns it. Anything that wants
-to change the sample count must go through `setTargetSamples`.
+to change the sample count must go through `setTargetSamples`. The start value comes from
+`TilesetViewer.js` (`scene.msaaSamples = 4`, Full).
 
 Two harnesses cover this feature. `tools/dynamic-msaa-probe.js` needs no tileset and no GPU
-(it runs headless on SwiftShader) and prints the per-frame state. `tools/dynamic-msaa-verify.js`
-needs a display, a GPU and the sample tileset, and measures the real GPU cost.
+(ANGLE on SwiftShader) and judges the feature on the DRAWN PIXELS: it counts the blended edge
+pixels of a white box and asserts hard edges while moving, smooth at rest. Its window must be
+**shown** — a hidden window gets no `requestAnimationFrame`, so nothing draws and it hangs.
+`tools/dynamic-msaa-verify.js` needs a display, a GPU and the sample tileset, and measures the
+real GPU cost. Both need `DISPLAY` (Electron starts GTK).
 
 ## Rotation-centre snapping (`RotationCenterSnap.js`)
 

@@ -106,7 +106,9 @@ app.whenReady().then(async () => {
     const out = {};
     try {
         const win = new BrowserWindow({
-            width: 1000, height: 700, show: false,
+            // SHOWN on purpose: a hidden window gets no requestAnimationFrame,
+            // so the scene draws nothing and __countEdge waits for ever.
+            width: 1000, height: 700, show: true,
             webPreferences: {
                 nodeIntegration: false, contextIsolation: true, sandbox: true,
                 backgroundThrottling: false, preload: path.join(ROOT, "preload.js"),
@@ -133,8 +135,9 @@ app.whenReady().then(async () => {
         out.bundleSignal = await wc.executeJavaScript(`(()=>{
             const d = window.tilesetViewer.dynamicMsaa;
             if (!d) return 'no DynamicMsaa';
-            if (d._state !== undefined || d._timer !== undefined) return 'per-frame compare (STALE BUNDLE - rebuild it)';
-            return 'camera moveStart/moveEnd (current)';
+            if (d._state !== undefined) return 'exact per-frame compare (STALE BUNDLE - rebuild it)';
+            if (d._reference === undefined) return 'camera moveStart/moveEnd (STALE BUNDLE - rebuild it)';
+            return 'tolerant compare against its own reference (current)';
         })()`);
         log("bundle signal:", out.bundleSignal);
 
