@@ -88,6 +88,21 @@
                                 </div>
                             </div>
 
+                            <div class="form-group">
+                                <label><strong>Performance</strong></label>
+                                <div class="perf-row">
+                                    <span>Frame rate</span>
+                                    <span id="perf-fps-value" class="perf-value">idle</span>
+                                </div>
+                                <div class="perf-row">
+                                    <span>Frame time</span>
+                                    <span id="perf-frame-ms-value" class="perf-value">idle</span>
+                                </div>
+                                <p class="desc">The viewer draws a frame only when the scene changes. Both values show
+                                    "idle" when nothing moves. The frame time is the time that the CPU needs to draw one
+                                    frame. It does not include the time that the GPU needs.</p>
+                            </div>
+
                             <hr style="width:100%;text-align:left;margin-left:0">
 
                             <div class="form-group">

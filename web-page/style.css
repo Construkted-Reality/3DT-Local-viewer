@@ -377,3 +377,15 @@ popups
     cursor: pointer;
     color: darkgray;
 }
+
+.perf-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.perf-row .perf-value {
+    font-variant-numeric: tabular-nums;
+    font-weight: bold;
+}

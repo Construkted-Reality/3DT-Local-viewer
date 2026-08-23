@@ -44,7 +44,10 @@ Existing explicit `requestRender()` calls (keep this list current if you add mor
 - `RotationCenterSnap.js` — rotation-centre marker show/hide
 
 Per-frame `scene.preUpdate`/`scene.postUpdate` listeners still fire every animation frame
-regardless of requestRenderMode — do not put expensive work there.
+regardless of requestRenderMode — do not put expensive work there. `scene.preRender`/
+`scene.postRender` are the opposite: Cesium raises them **only for frames it actually draws**,
+which is what the settings-panel FPS readout counts (`initPerformanceReadout` in
+`initSettingsPopup.js`). An idle scene draws nothing, so that readout shows `idle`, not `0 fps`.
 
 ## Rotation-centre snapping (`RotationCenterSnap.js`)
 

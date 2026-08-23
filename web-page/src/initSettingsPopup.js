@@ -4,6 +4,10 @@ import {Cesium3DTileset} from "./CesiumJsInc.js";
 // error (higher slider = lower SSE = higher detail). Keep both directions in sync.
 const SSE_SLIDER_MAX = 32;
 
+// How often the performance readout refreshes, in milliseconds. It is also the
+// window over which the frame rate and the frame time are averaged.
+const PERF_WINDOW_MS = 500;
+
 // Apply fn to every Cesium3DTileset currently in the scene.
 function forEachTileset(scene, fn) {
     for (let i = 0; i < scene.primitives.length; ++i) {
@@ -154,6 +158,73 @@ function initSettingsPopup() {
         msaaSelect.val('1');
         msaaSelect.prop('disabled', true);
     }
+
+    initPerformanceReadout();
 }
 
-export {initSettingsPopup}
+// Formats one measurement window for the readout. A window with no drawn frame
+// reads "idle", which is the normal state of a scene that nothing changes.
+// Exported for the unit test.
+function formatPerfWindow(frames, totalMs, elapsedMs) {
+    if (frames <= 0 || elapsedMs <= 0)
+        return {fps: 'idle', frameMs: 'idle'};
+
+    return {
+        fps: Math.round(frames * 1000 / elapsedMs) + ' fps',
+        frameMs: (totalMs / frames).toFixed(1) + ' ms',
+    };
+}
+
+// Live frame-rate and frame-time readout in the settings panel.
+//
+// Cesium raises preRender and postRender ONLY for the frames that it really
+// draws (see the requestRenderMode note in CLAUDE.md), so a count of those
+// events is a true frame rate. The span between the two events is the CPU time
+// of the render call. It does not include the GPU time, because postRender
+// fires when Cesium has issued the draw commands, not when the GPU finishes
+// them. Both handlers must stay cheap, because they run on every drawn frame.
+function initPerformanceReadout() {
+    const fpsEl = jQuery('#perf-fps-value');
+    const frameMsEl = jQuery('#perf-frame-ms-value');
+    const popup = jQuery('#construkted-popup-settings');
+    const scene = window.tilesetViewer.viewer.scene;
+
+    let frameStart = 0;
+    let frames = 0;
+    let totalMs = 0;
+
+    scene.preRender.addEventListener(function () {
+        frameStart = performance.now();
+    });
+
+    scene.postRender.addEventListener(function () {
+        totalMs += performance.now() - frameStart;
+        frames += 1;
+    });
+
+    // An idle scene draws no frame and raises no event, so a timer does the
+    // update. It reads the counters, then clears them for the next window. The
+    // timer writes to the DOM only while the settings panel is open.
+    let windowStart = performance.now();
+
+    setInterval(function () {
+        const now = performance.now();
+        const elapsed = now - windowStart;
+        const framesInWindow = frames;
+        const msInWindow = totalMs;
+
+        windowStart = now;
+        frames = 0;
+        totalMs = 0;
+
+        if (!popup.is(':visible'))
+            return;
+
+        const text = formatPerfWindow(framesInWindow, msInWindow, elapsed);
+
+        fpsEl.text(text.fps);
+        frameMsEl.text(text.frameMs);
+    }, PERF_WINDOW_MS);
+}
+
+export {initSettingsPopup, formatPerfWindow}
