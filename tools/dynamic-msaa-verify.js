@@ -20,6 +20,8 @@
 //     feature off. The difference is what the feature buys.
 //   - the time of the first frame after each change of the sample count. That
 //     frame rebuilds the scene framebuffer, so it is the cost of the feature.
+//   - the delay between the last frame of the drag and the frame that restores
+//     the sample count. That delay is what the user waits for a sharp image.
 //
 // Run:  DISPLAY=:0 node_modules/.bin/electron tools/dynamic-msaa-verify.js
 
@@ -34,8 +36,10 @@ const SETTLE_MS = 3000;
 const DRAG_STEPS = 40;
 const DRAG_STEP_MS = 16;
 
-// Longer than DynamicMsaa's IDLE_MS (250 ms), so the restore has fired.
-const REST_MS = 700;
+// Longer than scene.cameraEventWaitTime (500 ms), which is the time that
+// CesiumJS waits before it raises camera.moveEnd. The restore follows that
+// event, so a shorter wait here would read the state too early.
+const REST_MS = 1500;
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function log(...a) { console.log("[dyn-msaa]", ...a); }
@@ -82,7 +86,7 @@ const PROBE_SOURCE = `window.__msaaProbe = (function () {
 
     scene.postRender.addEventListener(function () {
         if (ext) gl.endQuery(ext.TIME_ELAPSED_EXT);
-        rows.push({cpuMs: performance.now() - start, samples: scene.msaaSamples, query: query, gpuMs: null});
+        rows.push({t: performance.now(), cpuMs: performance.now() - start, samples: scene.msaaSamples, query: query, gpuMs: null});
         query = null;
     });
 
@@ -96,7 +100,7 @@ const PROBE_SOURCE = `window.__msaaProbe = (function () {
                     && !gl.getParameter(ext.GPU_DISJOINT_EXT)) {
                     row.gpuMs = gl.getQueryParameter(row.query, gl.QUERY_RESULT) / 1e6;
                 }
-                out.push({cpuMs: row.cpuMs, gpuMs: row.gpuMs, samples: row.samples});
+                out.push({t: row.t, cpuMs: row.cpuMs, gpuMs: row.gpuMs, samples: row.samples});
             }
             return out;
         },
@@ -221,6 +225,17 @@ app.whenReady().then(async () => {
             return {body, transition};
         }
 
+        // The delay that the user waits for a sharp image: from the last frame
+        // of the movement to the frame that restores the sample count.
+        function restoreDelayMs(frames) {
+            for (let i = 1; i < frames.length; ++i) {
+                if (frames[i].samples > 1 && frames[i - 1].samples === 1)
+                    return Math.round(frames[i].t - frames[i - 1].t);
+            }
+
+            return null;
+        }
+
         const onSplit = split(on.all);
         const offSplit = split(off.all);
 
@@ -231,6 +246,7 @@ app.whenReady().then(async () => {
                 meanCpuMs: mean(onSplit.body.map(f => f.cpuMs)),
                 meanGpuMs: mean(onSplit.body.map(f => f.gpuMs).filter(v => v !== null)),
                 transitionFrames: onSplit.transition.map(f => ({samples: f.samples, cpuMs: f.cpuMs, gpuMs: f.gpuMs})),
+                restoreDelayMs: restoreDelayMs(on.all),
             },
             featureOff: {
                 dragFrames: off.during.length,

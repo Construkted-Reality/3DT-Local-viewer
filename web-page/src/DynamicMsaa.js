@@ -7,119 +7,61 @@
 // costs GPU time only on a drawn frame. Almost every drawn frame is therefore a
 // frame that the camera moves through, which is where a low frame rate is most
 // visible. This class spends the sample budget where it is free: 1 sample while
-// the camera moves, the chosen sample count after the camera holds still.
+// the camera moves, the chosen sample count after the camera stops.
+//
+// HOW IT KNOWS THAT THE CAMERA MOVES
+// CesiumJS answers that question itself. On every animation frame, before it
+// decides to draw, View.checkForCameraUpdates compares the camera with a clone
+// of the last known camera. It raises camera.moveStart on the first difference
+// and camera.moveEnd when the camera holds still for scene.cameraEventWaitTime
+// (500 ms). Both events run on every animation frame, not only on a drawn one,
+// so moveEnd arrives even though a still scene draws nothing.
+//
+// CAUTION: do NOT replace those two events with a comparison of camera.position
+// and camera.direction on each drawn frame. CesiumJS renormalizes the camera
+// vectors every frame, which changes their last bits with no input from the
+// user. An exact comparison reads that drift as movement and the sample count
+// never comes back. Measured drift with no input: camera.direction.y moved by
+// about 3e-16 per frame. checkForCameraUpdates does not see it, because it
+// compares with a relative epsilon of 1e-15.
 //
 // CAUTION: a write to scene.msaaSamples makes CesiumJS destroy and rebuild the
 // scene framebuffer on the next drawn frame (FramebufferManager.isDirty ->
 // destroy -> new Texture + new Renderbuffer at the full canvas size). One
-// transition therefore costs one allocation. Two rules keep that cost small:
-//   1. IDLE_MS holds the restore back, so a burst of wheel events pays for one
-//      transition and not for twenty.
-//   2. _apply writes the property only when the value really changes.
+// transition therefore costs one allocation. moveStart and moveEnd each fire
+// one time for each burst of movement, so one gesture costs two transitions.
 // tools/dynamic-msaa-verify.js measures the real cost of a transition.
 
-// How long the camera holds still before the samples come back, in milliseconds.
-const IDLE_MS = 250;
-
-// The nine numbers that say where the camera is and where it points. A change
-// in any of them is a camera movement. The up vector is in the list because a
-// roll changes it and leaves the other two the same.
-function readCamera(camera, out) {
-    const position = camera.position;
-    const direction = camera.direction;
-    const up = camera.up;
-    let changed = false;
-
-    const next = [
-        position.x, position.y, position.z,
-        direction.x, direction.y, direction.z,
-        up.x, up.y, up.z,
-    ];
-
-    for (let i = 0; i < 9; ++i) {
-        if (out[i] !== next[i]) {
-            out[i] = next[i];
-            changed = true;
-        }
-    }
-
-    return changed;
-}
-
 class DynamicMsaa {
-    // options.scene    the Cesium scene (needs msaaSamples, camera, preRender, requestRender)
-    // options.idleMs   optional override of the still time before the restore
-    // options.timers   optional {setTimeout, clearTimeout} for the unit test
+    // options.scene   the Cesium scene. It needs msaaSamples, requestRender and
+    //                 a camera with the moveStart and moveEnd events.
     constructor(options) {
         const scene = options.scene;
+        const camera = scene.camera;
 
         this._scene = scene;
-        this._idleMs = options.idleMs === undefined ? IDLE_MS : options.idleMs;
-        // CAUTION: keep the two arrow functions. A browser rejects
-        // window.setTimeout when another object calls it ("TypeError: Illegal
-        // invocation"), so {setTimeout: setTimeout} in a plain object breaks in
-        // the app and passes in node, which does not check the receiver.
-        const timers = options.timers || {};
-
-        this._setTimeout = timers.setTimeout || ((fn, ms) => setTimeout(fn, ms));
-        this._clearTimeout = timers.clearTimeout || ((id) => clearTimeout(id));
-
         this._enabled = false;
         this._targetSamples = scene.msaaSamples;
         this._moving = false;
-        this._timer = null;
-        this._state = new Float64Array(9);
-        this._started = false;
 
         // Instrumentation for tools/dynamic-msaa-verify.js.
         this._transitions = 0;
 
-        // preRender runs before CesiumJS builds the frame, and only for a frame
-        // that it really draws. A write here reaches the framebuffer update of
-        // the same frame, so the first moved frame already draws at 1 sample.
-        scene.preRender.addEventListener(() => this._onFrame());
-    }
+        // moveStart runs before CesiumJS builds the frame, so the first frame of
+        // the movement already draws at 1 sample. The movement draws its own
+        // frames, so this path asks for none.
+        camera.moveStart.addEventListener(() => {
+            this._moving = true;
+            this._apply();
+        });
 
-    // The camera moves only while frames are drawn, so the drawn frame is the
-    // right place to watch it. The stop is the absence of a frame, which no
-    // event reports, so a timer finds it.
-    _onFrame() {
-        const changed = readCamera(this._scene.camera, this._state);
-
-        // The first frame only fills the state. There is nothing to compare it
-        // with yet.
-        if (!this._started) {
-            this._started = true;
-            return;
-        }
-
-        if (!changed || !this._enabled || this._targetSamples <= 1)
-            return;
-
-        this._moving = true;
-        this._apply();
-        this._restartIdleTimer();
-    }
-
-    _restartIdleTimer() {
-        this._cancelIdleTimer();
-
-        this._timer = this._setTimeout(() => {
-            this._timer = null;
+        // The scene is idle when the camera stops, so nothing else asks for the
+        // frame that shows the smooth edges.
+        camera.moveEnd.addEventListener(() => {
             this._moving = false;
             this._apply();
-
-            // The scene is idle at this point, so nothing else asks for the
-            // frame that shows the smooth edges.
             this._scene.requestRender();
-        }, this._idleMs);
-    }
-
-    _cancelIdleTimer() {
-        if (this._timer !== null) {
-            this._clearTimeout(this._timer);
-            this._timer = null;
-        }
+        });
     }
 
     _apply() {
@@ -136,12 +78,6 @@ class DynamicMsaa {
     // count at once.
     setEnabled(enabled) {
         this._enabled = enabled;
-
-        if (!enabled) {
-            this._cancelIdleTimer();
-            this._moving = false;
-        }
-
         this._apply();
         this._scene.requestRender();
     }
@@ -171,4 +107,4 @@ class DynamicMsaa {
     }
 }
 
-export {DynamicMsaa, readCamera, IDLE_MS}
+export {DynamicMsaa}

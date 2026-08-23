@@ -30,3 +30,4 @@ out/
 
 # Regenerable probe output (tools/dynamic-msaa-verify.js)
 /tools/traces/dynamic-msaa-verify.json
+/tools/traces/dynamic-msaa-probe.json
