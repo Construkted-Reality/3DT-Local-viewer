@@ -1,8 +1,13 @@
 import {Cesium3DTileset} from "./CesiumJsInc.js";
+import {getAppVersion} from "./appVersion.js";
 
 // The SSE slider runs 0..SSE_SLIDER_MAX and maps inversely to screen-space
 // error (higher slider = lower SSE = higher detail). Keep both directions in sync.
 const SSE_SLIDER_MAX = 32;
+
+// How often the performance readout refreshes, in milliseconds. It is also the
+// window over which the frame rate and the frame time are averaged.
+const PERF_WINDOW_MS = 500;
 
 // Apply fn to every Cesium3DTileset currently in the scene.
 function forEachTileset(scene, fn) {
@@ -134,6 +139,198 @@ function initSettingsPopup() {
         viewer.scene.postProcessStages.fxaa.enabled = this.checked;
         viewer.scene.requestRender();
     });
+
+    // Multisampling. scene.msaaSamples is a live property (default 4). A value
+    // of 1 turns it off. The scene ignores it when the context has no MSAA
+    // support, so disable the control in that case.
+    const msaaSelect = jQuery('#msaa-samples-select');
+    const msaaScene = window.tilesetViewer.viewer.scene;
+
+    if (msaaScene.msaaSupported) {
+        msaaSelect.val(String(msaaScene.msaaSamples));
+
+        msaaSelect.change(function () {
+            const scene = window.tilesetViewer.viewer.scene;
+
+            scene.msaaSamples = parseInt(this.value, 10);
+            scene.requestRender();
+        });
+    } else {
+        msaaSelect.val('1');
+        msaaSelect.prop('disabled', true);
+    }
+
+    initPerformanceReadout();
+
+    getAppVersion().then((version) => jQuery('#app-version-value').text(version));
 }
 
-export {initSettingsPopup}
+// GPU frame time comes from a WebGL2 timer query. The extension is a draft one,
+// so Chromium exposes it only when the main process passes
+// --enable-webgl-draft-extensions (see index.js). A driver can still refuse it.
+const GPU_TIMER_EXTENSION = 'EXT_disjoint_timer_query_webgl2';
+
+// Wraps one TIME_ELAPSED query around each drawn frame. The GPU answers a few
+// frames late, so begin/end only queue the work and collect() reads whatever
+// finished since the last call. Returns null when the extension is missing.
+//
+// Two rules of the extension drive this code:
+//   1. Only one TIME_ELAPSED query can be active on a context at a time.
+//   2. A "disjoint" period means the GPU changed context and every result in
+//      that period is wrong. Throw those results away.
+function createGpuTimer(scene) {
+    const canvas = scene.canvas;
+    const gl = canvas && typeof canvas.getContext === 'function' ? canvas.getContext('webgl2') : null;
+    const ext = gl ? gl.getExtension(GPU_TIMER_EXTENSION) : null;
+
+    if (!ext)
+        return null;
+
+    let active = null;
+    let pending = [];
+
+    return {
+        begin() {
+            if (active)
+                return;
+
+            const query = gl.createQuery();
+
+            gl.beginQuery(ext.TIME_ELAPSED_EXT, query);
+            active = query;
+        },
+
+        end() {
+            if (!active)
+                return;
+
+            gl.endQuery(ext.TIME_ELAPSED_EXT);
+            pending.push(active);
+            active = null;
+        },
+
+        // Mean of the results that finished since the last call, in
+        // milliseconds, or null when nothing finished.
+        collect() {
+            const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
+            const stillPending = [];
+            let total = 0;
+            let count = 0;
+
+            for (const query of pending) {
+                if (!gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE)) {
+                    stillPending.push(query);
+                    continue;
+                }
+
+                if (!disjoint) {
+                    total += gl.getQueryParameter(query, gl.QUERY_RESULT) / 1e6;
+                    count += 1;
+                }
+
+                gl.deleteQuery(query);
+            }
+
+            pending = stillPending;
+
+            return count > 0 ? total / count : null;
+        },
+    };
+}
+
+// Formats the GPU value. Exported for the unit test.
+function formatGpuWindow(frames, meanMs, supported) {
+    if (!supported)
+        return 'not available';
+
+    if (frames <= 0)
+        return 'idle';
+
+    if (meanMs === null || meanMs === undefined)
+        return 'measuring';
+
+    return meanMs.toFixed(1) + ' ms';
+}
+
+// Formats one measurement window for the readout. A window with no drawn frame
+// reads "idle", which is the normal state of a scene that nothing changes.
+// Exported for the unit test.
+function formatPerfWindow(frames, totalMs, elapsedMs) {
+    if (frames <= 0 || elapsedMs <= 0)
+        return {fps: 'idle', frameMs: 'idle'};
+
+    return {
+        fps: Math.round(frames * 1000 / elapsedMs) + ' fps',
+        frameMs: (totalMs / frames).toFixed(1) + ' ms',
+    };
+}
+
+// Live frame-rate and frame-time readout in the settings panel.
+//
+// Cesium raises preRender and postRender ONLY for the frames that it really
+// draws (see the requestRenderMode note in CLAUDE.md), so a count of those
+// events is a true frame rate. The span between the two events is the CPU time
+// of the render call. It does not include the GPU time, because postRender
+// fires when Cesium has issued the draw commands, not when the GPU finishes
+// them. Both handlers must stay cheap, because they run on every drawn frame.
+function initPerformanceReadout() {
+    const fpsEl = jQuery('#perf-fps-value');
+    const frameMsEl = jQuery('#perf-frame-ms-value');
+    const gpuMsEl = jQuery('#perf-gpu-ms-value');
+    const popup = jQuery('#construkted-popup-settings');
+    const scene = window.tilesetViewer.viewer.scene;
+    const gpuTimer = createGpuTimer(scene);
+
+    let frameStart = 0;
+    let frames = 0;
+    let totalMs = 0;
+    let lastGpuMs = null;
+
+    scene.preRender.addEventListener(function () {
+        frameStart = performance.now();
+
+        if (gpuTimer)
+            gpuTimer.begin();
+    });
+
+    scene.postRender.addEventListener(function () {
+        if (gpuTimer)
+            gpuTimer.end();
+
+        totalMs += performance.now() - frameStart;
+        frames += 1;
+    });
+
+    // An idle scene draws no frame and raises no event, so a timer does the
+    // update. It reads the counters, then clears them for the next window. The
+    // timer writes to the DOM only while the settings panel is open.
+    let windowStart = performance.now();
+
+    setInterval(function () {
+        const now = performance.now();
+        const elapsed = now - windowStart;
+        const framesInWindow = frames;
+        const msInWindow = totalMs;
+        const gpuSample = gpuTimer ? gpuTimer.collect() : null;
+
+        windowStart = now;
+        frames = 0;
+        totalMs = 0;
+
+        // A query can arrive after its window closes, so keep the last result
+        // and show it until a newer one arrives.
+        if (gpuSample !== null)
+            lastGpuMs = gpuSample;
+
+        if (!popup.is(':visible'))
+            return;
+
+        const text = formatPerfWindow(framesInWindow, msInWindow, elapsed);
+
+        fpsEl.text(text.fps);
+        frameMsEl.text(text.frameMs);
+        gpuMsEl.text(formatGpuWindow(framesInWindow, lastGpuMs, gpuTimer !== null));
+    }, PERF_WINDOW_MS);
+}
+
+export {initSettingsPopup, formatPerfWindow, formatGpuWindow, createGpuTimer}

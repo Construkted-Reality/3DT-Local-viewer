@@ -9,6 +9,13 @@ let mainWindow;
 
 const openDevTool = false;
 
+// The settings panel measures GPU frame time with the WebGL2 extension
+// EXT_disjoint_timer_query_webgl2. Chromium hides that extension behind the
+// draft-extension switch, so the renderer cannot get it without this line.
+// The app displays only its own bundled local page, so the wider extension set
+// reaches no third-party content. Cesium itself does not use draft extensions.
+app.commandLine.appendSwitch('enable-webgl-draft-extensions');
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 800,
@@ -83,6 +90,10 @@ ipcMain.on('window-max-unmax', () => {
 ipcMain.on('window-close', () => {
     if (mainWindow) mainWindow.close();
 });
+
+// The settings panel shows this value. app.getVersion() reads the version of
+// the running app, so a stale renderer bundle cannot report an old version.
+ipcMain.handle('app-version', () => app.getVersion());
 
 ipcMain.handle('window-is-maximized', () => {
     return mainWindow ? mainWindow.isMaximized() : false;
