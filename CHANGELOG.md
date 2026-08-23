@@ -1,5 +1,26 @@
 # Change Log
 
+### 1.7.0 - 2026-08-23
+
+#### Added
+
+- Measurement tool: click two points and read the distance between them. A MEASURE button in the navigation control bar starts it. The tool and fly mode exclude each other. The read-out is a DOM and SVG overlay, because Gaussian splats draw after the translucent pass and would cover in-scene geometry.
+- Measurement on Gaussian splats uses a two-pass pick. The first pass queries the decimated set of splat centres. The second pass (`SplatPivotSource.refine`) scans the full-density centres near that hit and returns the true nearest centre, an aggregate of the nearest few weighted by opacity, and the spread of that aggregate as the uncertainty. The refine runs once per click.
+- Tiered snapping by operation and by tileset type (`pickTiers.js`, `PICK_POLICY`). The search tries a small radius first and stops at the first hit, so a direct hit on far geometry is never stolen by a nearer surface a few pixels away. The pivot uses forgiving radii and prefers the foreground. Measurement uses precise radii. Gaussian splats use wider radii than a mesh, because the decimated centres are sparser.
+- Measure mode shows a hover ring where a click would land.
+- The rotation-centre crosshair now also appears during a tilt (right drag).
+- `tools/gs-measure-verify.js`: a harness that drives the real app against a Gaussian-splat tileset and checks the refine, the precision delta, a known distance, and the overlay.
+- `web-page/src/pickTiers.test.mjs` and `web-page/src/SplatPivotSource.test.mjs`: headless tests for the tier search and for the refine.
+
+#### Changed
+
+- The spin and the tilt gestures refine the splat pivot to full density, because they pick the pivot once per gesture. Zoom keeps the decimated query, because it picks 40 to 60 times per gesture. A per-frame memo bounds the refine to one call per frame and per pixel.
+
+#### Known limits
+
+- The Gaussian-splat measurement and the tiered snapping are verified by headless tests only. They are not yet verified in the running app, which needs a display, a GPU and a Gaussian-splat tileset. Run `tools/gs-measure-verify.js` to close this.
+- The 1.6.0 settings-panel work is also not yet verified in the running app. Run `tools/msaa-verify.js` and `tools/perf-readout-verify.js` to close this.
+
 ### 1.6.0 - 2026-08-23
 
 #### Added
