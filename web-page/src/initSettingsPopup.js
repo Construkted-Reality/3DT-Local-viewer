@@ -134,6 +134,26 @@ function initSettingsPopup() {
         viewer.scene.postProcessStages.fxaa.enabled = this.checked;
         viewer.scene.requestRender();
     });
+
+    // Multisampling. scene.msaaSamples is a live property (default 4). A value
+    // of 1 turns it off. The scene ignores it when the context has no MSAA
+    // support, so disable the control in that case.
+    const msaaSelect = jQuery('#msaa-samples-select');
+    const msaaScene = window.tilesetViewer.viewer.scene;
+
+    if (msaaScene.msaaSupported) {
+        msaaSelect.val(String(msaaScene.msaaSamples));
+
+        msaaSelect.change(function () {
+            const scene = window.tilesetViewer.viewer.scene;
+
+            scene.msaaSamples = parseInt(this.value, 10);
+            scene.requestRender();
+        });
+    } else {
+        msaaSelect.val('1');
+        msaaSelect.prop('disabled', true);
+    }
 }
 
 export {initSettingsPopup}
