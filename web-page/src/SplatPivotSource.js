@@ -30,6 +30,10 @@ import {
 const MAX_CENTERS = 40000;
 // Opacity below this is treated as a floater and excluded (alpha normalised to 0..1).
 const MIN_OPACITY = 0.15;
+// k for the refine pass: the measurement point is the opacity-weighted mean of the k
+// full-density centres nearest the coarse hit, and the spread of those k is the reported
+// uncertainty. Small enough to stay local to the clicked feature.
+const K_NEAREST = 32;
 
 class SplatPivotSource {
     // options: { getTilesets: () => Array<Cesium3DTileset> }
@@ -41,9 +45,13 @@ class SplatPivotSource {
 
     // Nearest splat center to the cursor (within radiusPx), nearest the camera. Or undefined.
     query(scene, windowPosition, radiusPx) {
+        const t0 = performance.now();
         this._ensureFresh();
         const centers = this._centers;
-        if (centers.length === 0) return undefined;
+        if (centers.length === 0) {
+            this._lastQueryMs = performance.now() - t0;
+            return undefined;
+        }
 
         const camPos = scene.camera.positionWC;
         const r2 = radiusPx * radiusPx;
@@ -66,7 +74,131 @@ class SplatPivotSource {
                 best = Cartesian3.clone(scratchWorld, best === undefined ? new Cartesian3() : best);
             }
         }
+        this._lastQueryMs = performance.now() - t0;
         return best;
+    }
+
+    // Refine a coarse world hit to full-density precision — the measurement path.
+    //
+    // The pivot query() above works off the decimated 40k set: fine for a rotation centre,
+    // too coarse for a measurement. refine() instead reads the FULL-density centres Cesium
+    // already holds in _positions. Those live in each tileset's local frame, so we transform
+    // the (single) coarse hit into that frame once and scan the raw array with a plain 3D
+    // distance test — no per-point matrix multiply, no projection. Only the handful of
+    // survivors within the radius are transformed to world for the final maths.
+    //
+    // Returns { nearest, aggregate, spread, count, ms } or undefined:
+    //   nearest   Cartesian3  true nearest full-density centre to the coarse hit
+    //   aggregate Cartesian3  opacity-weighted mean of the k nearest — the measurement point
+    //   spread    Number      weighted RMS distance (m) of the k nearest about aggregate — the ±
+    //   count     Number      candidates found within the radius
+    //   ms        Number      wall-clock of the scan
+    //
+    // This is a one-shot per-click cost (tens of ms even at millions of splats), not a
+    // per-frame cost. See docs/plans/2026-07-09-gs-measurement-plan.md.
+    refine(scene, coarseWorld, radiusPx) {
+        const t0 = performance.now();
+        const tilesets = (this._getTilesets() || []).filter(
+            (t) => t && t.gaussianSplatPrimitive && t.gaussianSplatPrimitive._numSplats > 0,
+        );
+        if (tilesets.length === 0) return undefined;
+
+        const worldRadius = this._worldRadius(scene, coarseWorld, radiusPx);
+
+        // Survivors within the radius, in world space, tagged with distance² to the coarse
+        // hit and an opacity weight. Collected across all splat tilesets.
+        const survivors = [];
+        for (const t of tilesets) {
+            this._collectNearest(t, coarseWorld, worldRadius, survivors);
+        }
+        if (survivors.length === 0) return undefined;
+
+        survivors.sort((a, b) => a.d2 - b.d2);
+        const k = Math.min(K_NEAREST, survivors.length);
+
+        const n0 = survivors[0];
+        const nearest = new Cartesian3(n0.x, n0.y, n0.z);
+
+        // Opacity-weighted mean of the k nearest → the measurement point. Averages out the
+        // scatter of individual splat centres about the reconstructed surface.
+        let wx = 0, wy = 0, wz = 0, wsum = 0;
+        for (let i = 0; i < k; i++) {
+            const s = survivors[i];
+            wx += s.x * s.w; wy += s.y * s.w; wz += s.z * s.w; wsum += s.w;
+        }
+        const inv = wsum > 0 ? 1 / wsum : 0;
+        const aggregate = new Cartesian3(wx * inv, wy * inv, wz * inv);
+
+        // Weighted RMS distance of the k nearest about the aggregate → measurement uncertainty.
+        let vsum = 0;
+        for (let i = 0; i < k; i++) {
+            const s = survivors[i];
+            const dx = s.x - aggregate.x, dy = s.y - aggregate.y, dz = s.z - aggregate.z;
+            vsum += s.w * (dx * dx + dy * dy + dz * dz);
+        }
+        const spread = wsum > 0 ? Math.sqrt(vsum * inv) : 0;
+
+        return { nearest, aggregate, spread, count: survivors.length, ms: performance.now() - t0 };
+    }
+
+    // Scan one tileset's full-density centres and push survivors within worldRadius of
+    // coarseWorld into `out`. The cheap distance filter runs in the tileset's local frame
+    // (raw _positions, no per-point transform); only survivors are lifted to world.
+    _collectNearest(t, coarseWorld, worldRadius, out) {
+        const gsp = t.gaussianSplatPrimitive;
+        const pos = gsp._positions;
+        const colors = gsp._colors;
+        const rt = gsp._rootTransform;
+        const n = gsp._numSplats;
+        const colorScale = this._opacityScale(colors, n);
+
+        // Query point in the local frame; scan there, report world.
+        Matrix4.inverse(rt, scratchInv);
+        Matrix4.multiplyByPoint(scratchInv, coarseWorld, scratchQLocal);
+        // Uniform-scale assumption (georef root transforms are rigid or uniformly scaled):
+        // convert the world radius into the local frame so the filter threshold is correct.
+        Matrix4.getScale(rt, scratchScale);
+        const s = scratchScale.x || 1;
+        const localR = worldRadius / s;
+        const localR2 = localR * localR;
+
+        const qx = scratchQLocal.x, qy = scratchQLocal.y, qz = scratchQLocal.z;
+        for (let i = 0; i < n; i++) {
+            const lx = pos[i * 3], ly = pos[i * 3 + 1], lz = pos[i * 3 + 2];
+            const dx = lx - qx, dy = ly - qy, dz = lz - qz;
+            if (dx * dx + dy * dy + dz * dz > localR2) continue;
+            let w = 1;
+            if (colorScale > 0) {
+                w = colors[i * 4 + 3] * colorScale;
+                if (w < MIN_OPACITY) continue; // floater
+            }
+            scratchLocal.x = lx; scratchLocal.y = ly; scratchLocal.z = lz;
+            Matrix4.multiplyByPoint(rt, scratchLocal, scratchWorld);
+            const wdx = scratchWorld.x - coarseWorld.x;
+            const wdy = scratchWorld.y - coarseWorld.y;
+            const wdz = scratchWorld.z - coarseWorld.z;
+            out.push({
+                x: scratchWorld.x, y: scratchWorld.y, z: scratchWorld.z,
+                w: w,
+                d2: wdx * wdx + wdy * wdy + wdz * wdz,
+            });
+        }
+    }
+
+    // World-space radius corresponding to radiusPx screen pixels at the hit's depth.
+    _worldRadius(scene, worldPoint, radiusPx) {
+        const camera = scene.camera;
+        const distance = Cartesian3.distance(camera.positionWC, worldPoint);
+        const w = scene.drawingBufferWidth, h = scene.drawingBufferHeight;
+        const pr = scene.pixelRatio || 1;
+        try {
+            const dims = camera.frustum.getPixelDimensions(w, h, distance, pr, scratchPixel);
+            return Math.max(dims.x, dims.y) * radiusPx;
+        } catch (e) {
+            // Fallback for non-perspective frustums: ~2·d·tan(fovy/2)/h per pixel.
+            const fovy = camera.frustum.fovy || 1.0;
+            return ((2 * distance * Math.tan(fovy / 2)) / h) * radiusPx * pr;
+        }
     }
 
     // Rebuild the center set if any tileset's splat count changed since last build.
@@ -131,5 +263,9 @@ class SplatPivotSource {
 const scratchLocal = new Cartesian3();
 const scratchWorld = new Cartesian3();
 const scratchScreen = new Cartesian2();
+const scratchInv = new Matrix4();
+const scratchQLocal = new Cartesian3();
+const scratchScale = new Cartesian3();
+const scratchPixel = new Cartesian2();
 
 export { SplatPivotSource };

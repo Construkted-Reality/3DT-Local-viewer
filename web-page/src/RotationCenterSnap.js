@@ -6,39 +6,60 @@ import {
 } from "./CesiumJsInc.js";
 
 import {SplatPivotSource} from "./SplatPivotSource.js";
+import {pickTiered, ringSamplesFor} from "./pickTiers.js";
 
 // Snaps the camera's rotate/tilt/zoom pivot to the nearest visible tileset point
 // near the cursor, and shows a crosshair marker at the rotation centre.
 //
 // HOW: Cesium's ScreenSpaceCameraController derives every gesture pivot from
 // scene.pickPositionWorldCoordinates (verified for 1.142 by tools/pivot-probe.js:
-// rotate calls it 1x, tilt 1x, zoom 40-60x). We shadow that one instance method
-// with a neighbourhood search: sample the cursor pixel plus a ring of points at
-// SNAP_RADIUS_PX, and return the hit NEAREST THE CAMERA. "Nearest the camera"
-// (not nearest the cursor) is deliberate — if the user clicks through a hole in a
-// lattice tower, the close member a few px away wins over the far background seen
-// through the gap, so they orbit the thing they meant to.
+// rotate calls it 1x, tilt 1x, zoom 40-60x). We shadow that one instance method with a
+// TIERED neighbourhood search (see pickTiers.js): try screen radii from small to large and
+// stop at the first tier that hits, nearest-to-camera within a tier.
 //
-// A genuine miss (no geometry within the ring) returns undefined, exactly as the
-// stock method would: with the globe hidden there is no far-ellipsoid fallback, so
-// the controller just rotates in place — benign.
+// The search is tuned on two axes — operation and tileset type — via PICK_POLICY below:
+//   - Pivot is forgiving (tier 0 is a small ring so a closer surface just off the cursor
+//     takes the rotation centre — the lattice-through-a-hole case).
+//   - Measurement is precise (tier 0 is the exact pixel, so a direct hit on far geometry is
+//     never stolen by a nearer thing a few px away; forgiveness only expands on a true miss).
+//   - Gaussian splats use wider radii than mesh/point-cloud: the decimated splat centres are
+//     sparser on screen than per-pixel depth, so the cursor needs a wider catch.
 //
-// This wrap is intentionally the whole feature: snapping the pick snaps the pivot
-// for rotate, tilt AND zoom at once, with no fork of Cesium's controller. The
-// alternative — owning the orbit/pan/zoom handlers ourselves — is recorded as a
-// future option in docs/reports (Adrian wants to try it later); see CLAUDE.md.
+// A genuine miss (nothing in any tier) returns undefined, exactly as the stock method would:
+// with the globe hidden there is no far-ellipsoid fallback, so the controller just rotates in
+// place — benign.
+//
+// This wrap is intentionally the whole feature: snapping the pick snaps the pivot for rotate,
+// tilt AND zoom at once, with no fork of Cesium's controller.
 
-// Search radius (px) around the cursor. A modest value: large enough to grab a
-// silhouette edge or a near lattice member, small enough not to yank the pivot
-// onto unrelated geometry. No settings UI by decision; tune here if needed.
-const SNAP_RADIUS_PX = 16;
-// Ring sample count. Center + RING_SAMPLES points = total depth reads per resolve.
-// 8 keeps cost at the proven 9-reads-per-pick level the web platform shipped.
-const RING_SAMPLES = 8;
+// Tier radii (px) by operation × tileset type. Ascending; tier 0 is the centre pixel (r=0)
+// or a small ring (r>0). These are FEEL constants — tune by clicking, not by reasoning; the
+// measure-mode hover preview (MeasureTool) makes a bad radius obvious before you commit.
+const PICK_POLICY = {
+    pivot:   {mesh: [5, 16], gs: [8, 28]},
+    measure: {mesh: [0, 2, 5], gs: [4, 10, 20]},
+};
 
-// Splat fallback search radius (px). Larger than the mesh ring because decimated
-// splat centres are sparser than per-pixel depth, so the cursor needs a wider catch.
-const SPLAT_SNAP_RADIUS_PX = 28;
+// Ring sampling: aim for one depth read every RING_SPACING_PX around a ring, clamped. Scales
+// so a 5px ring isn't oversampled and a 16px ring isn't so sparse it straddles thin geometry.
+const RING_SPACING_PX = 5;
+const MIN_RING_SAMPLES = 4;
+const MAX_RING_SAMPLES = 20;
+const ringSamples = (r) => ringSamplesFor(r, RING_SPACING_PX, MIN_RING_SAMPLES, MAX_RING_SAMPLES);
+
+// Set true to log which (operation, source, tier) resolved each pick — handy while tuning
+// PICK_POLICY. Off by default.
+const DEBUG_PICK = false;
+
+// Screen radius (px) of the full-density refine catchment for a measurement click. Small
+// — we want the splat centres local to the clicked feature, not a wide neighbourhood.
+const MEASURE_REFINE_RADIUS_PX = 12;
+
+// Screen radius (px) for refining the spin/tilt pivot to full density. Same catchment as a
+// measurement click; the gain over the decimated pivot is small but the cost is one refine
+// per gesture (spin/tilt pick once), so it's affordable — unlike zoom (40-60 picks/gesture,
+// left on the decimated query).
+const PIVOT_REFINE_RADIUS_PX = 12;
 
 // Crosshair marker: a circle with a centre dot, drawn as an SVG data URI so we carry
 // no image asset. disableDepthTestDistance keeps it visible through geometry. The
@@ -67,6 +88,21 @@ class RotationCenterSnap {
         // When fly mode owns the camera the default controller is disabled and the
         // wrap is never called anyway; this only gates the marker.
         this._isFlyActive = options.isFlyActive || (() => false);
+        // While measure mode is active, suppress the pivot crosshair on left-down so it
+        // doesn't compete with the measurement overlay (orbit-drag still works).
+        this._isMeasureActive = options.isMeasureActive || (() => false);
+
+        // Active drag gesture: "spin" (left-drag), "tilt" (right-drag), or null. Only
+        // spin/tilt refine their pivot to full density (they pick once per gesture); zoom
+        // does not (it picks 40-60x). Set by the gesture handler.
+        this._gesture = null;
+        // Monotonic count of splat-pivot refines actually performed — instrumentation for
+        // tools/gs-measure-verify.js to assert zoom never refines.
+        this._refineCount = 0;
+        // Source and tier of the last resolve — "mesh" | "splat" | "none", and the winning
+        // tier index. Read by _pivotPoint (refine only splat pivots) and by the harness.
+        this._lastResolveSource = "none";
+        this._lastResolveTier = -1;
 
         // Gaussian-splat fallback: splats aren't depth-pickable, so when the mesh
         // depth pick misses we snap to the nearest splat centre instead.
@@ -88,63 +124,125 @@ class RotationCenterSnap {
         // infinite recursion.
         this._origPick = scene.pickPositionWorldCoordinates.bind(scene);
 
-        // Per-frame memo so a zoom burst's 40+ same-pixel picks collapse to one
-        // neighbourhood search per frame. Cleared each frame.
-        this._memo = new Map();
+        // Per-frame memos so repeated same-pixel picks within a frame collapse to one tiered
+        // search (_resolveMemo, keyed by operation+pixel) and one refine (_pivotMemo).
+        // Cleared each frame. pivot-probe measured spin/tilt as one pick per gesture on a MESH
+        // tileset; splat call frequency is unmeasured, so the memos bound cost to once/frame.
+        this._resolveMemo = new Map();
+        this._pivotMemo = new Map();
         this._frame = 0;
         scene.preRender.addEventListener(() => {
             this._frame++;
-            this._memo.clear();
+            this._resolveMemo.clear();
+            this._pivotMemo.clear();
         });
 
         scene.pickPositionWorldCoordinates = (windowPosition, result) => {
-            const snapped = this._resolve(windowPosition);
-            if (snapped) {
-                return Cartesian3.clone(snapped, result);
+            const pivot = this._pivotPoint(windowPosition);
+            if (pivot) {
+                return Cartesian3.clone(pivot, result);
             }
             return this._origPick(windowPosition, result);
         };
     }
 
-    // Nearest-to-camera hit within SNAP_RADIUS_PX of windowPosition, or undefined.
+    // The pivot point for the current gesture: the snapped hit, refined to full-density
+    // splat precision for spin/tilt (but not zoom, and not mesh hits — mesh depth is
+    // already exact). Used by both the pick shadow and the marker so they agree.
+    _pivotPoint(windowPosition) {
+        const snapped = this._resolveTiered(windowPosition, "pivot");
+        if (!snapped) return undefined;
+        if (
+            this._splatSource &&
+            this._lastResolveSource === "splat" &&
+            (this._gesture === "spin" || this._gesture === "tilt")
+        ) {
+            const key = Math.round(windowPosition.x) + "," + Math.round(windowPosition.y);
+            if (this._pivotMemo.has(key)) {
+                return this._pivotMemo.get(key);
+            }
+            const refined = this._splatSource.refine(this._scene, snapped, PIVOT_REFINE_RADIUS_PX);
+            const pivot = refined ? refined.aggregate : snapped;
+            if (refined) this._refineCount++;
+            this._pivotMemo.set(key, pivot);
+            return pivot;
+        }
+        return snapped;
+    }
+
+    // Backward-compat alias used by the verification harnesses (tools/*.js): the pivot
+    // resolve. Returns the point (undefined on a miss); source/tier land on the instance.
     _resolve(windowPosition) {
-        const key = Math.round(windowPosition.x) + "," + Math.round(windowPosition.y);
-        if (this._memo.has(key)) {
-            return this._memo.get(key);
+        return this._resolveTiered(windowPosition, "pivot");
+    }
+
+    // Tiered resolve for the given operation ("pivot" | "measure"). Mesh depth tiers first
+    // (exact, preferred); on a full mesh miss, the Gaussian-splat tiers. Records the winning
+    // source and tier on the instance; memoised per frame by operation+pixel.
+    _resolveTiered(windowPosition, operation) {
+        const key =
+            operation + ":" + Math.round(windowPosition.x) + "," + Math.round(windowPosition.y);
+        if (this._resolveMemo.has(key)) {
+            const m = this._resolveMemo.get(key);
+            this._lastResolveSource = m.src;
+            this._lastResolveTier = m.tier;
+            return m.p;
         }
 
-        const camPos = this._scene.camera.positionWC;
-        let best;
-        let bestDist = Number.POSITIVE_INFINITY;
+        const policy = PICK_POLICY[operation];
+        let point;
+        let src = "none";
+        let tier = -1;
 
-        const consider = (x, y) => {
+        const mesh = this._depthTiers(windowPosition, policy.mesh);
+        if (mesh) {
+            point = mesh.point;
+            src = "mesh";
+            tier = mesh.tier;
+        } else if (this._splatSource) {
+            const gs = this._splatTiers(windowPosition, policy.gs);
+            if (gs) {
+                point = gs.point;
+                src = "splat";
+                tier = gs.tier;
+            }
+        }
+
+        this._resolveMemo.set(key, {p: point, src, tier});
+        this._lastResolveSource = src;
+        this._lastResolveTier = tier;
+        if (DEBUG_PICK) {
+            // eslint-disable-next-line no-console
+            console.log(`[pick] ${operation} src=${src} tier=${tier}`);
+        }
+        return point;
+    }
+
+    // Mesh/point-cloud depth tiers: sample the depth buffer at the tier radii, nearest-to-
+    // camera within a tier, first tier with a hit wins. { point, tier } or undefined.
+    _depthTiers(windowPosition, radii) {
+        const camPos = this._scene.camera.positionWC;
+        const sample = (x, y) => {
             scratchSample.x = x;
             scratchSample.y = y;
             const hit = this._origPick(scratchSample, scratchHit);
-            if (!hit) return;
-            const d = Cartesian3.distance(hit, camPos);
-            if (d < bestDist) {
-                bestDist = d;
-                best = Cartesian3.clone(hit, best === undefined ? new Cartesian3() : best);
-            }
+            if (!hit) return undefined;
+            return {
+                point: Cartesian3.clone(hit, new Cartesian3()),
+                camDist: Cartesian3.distance(hit, camPos),
+            };
         };
+        return pickTiered(windowPosition.x, windowPosition.y, radii, sample, ringSamples);
+    }
 
-        consider(windowPosition.x, windowPosition.y);
-        for (let i = 0; i < RING_SAMPLES; i++) {
-            const a = (2 * Math.PI * i) / RING_SAMPLES;
-            consider(
-                windowPosition.x + SNAP_RADIUS_PX * Math.cos(a),
-                windowPosition.y + SNAP_RADIUS_PX * Math.sin(a),
-            );
+    // Gaussian-splat tiers: query() already returns the nearest-to-camera centre within a
+    // screen radius, so the smallest tier radius that catches anything wins. { point, tier }.
+    _splatTiers(windowPosition, radii) {
+        for (let ti = 0; ti < radii.length; ti++) {
+            const hit = this._splatSource.query(this._scene, windowPosition, radii[ti]);
+            if (hit) return {point: hit, tier: ti};
         }
-
-        // Mesh depth pick found nothing — try the Gaussian-splat centre fallback.
-        if (best === undefined && this._splatSource) {
-            best = this._splatSource.query(this._scene, windowPosition, SPLAT_SNAP_RADIUS_PX);
-        }
-
-        this._memo.set(key, best);
-        return best;
+        return undefined;
     }
 
     // --- rotation-centre marker ---------------------------------------------
@@ -197,21 +295,68 @@ class RotationCenterSnap {
 
     // --- gesture wiring ------------------------------------------------------
 
-    // The marker indicates the ROTATION centre, so it's bound to plain left-drag
-    // (this app maps rotate -> LEFT_DRAG). The pivot Cesium will orbit comes from
-    // the same _resolve() the wrap uses, so the marker and the orbit centre agree.
+    // The marker indicates the rotation centre for both orbit gestures: spin (left-drag)
+    // and tilt (right-drag). The pivot comes from the same _pivotPoint() the pick wrap
+    // uses, so the marker and the orbit centre agree.
     _installGestureHandler() {
         this._handler = new ScreenSpaceEventHandler(this._scene.canvas);
 
-        this._handler.setInputAction((event) => {
-            if (this._isFlyActive()) return;
-            const point = this._resolve(event.position);
-            if (point) {
-                this._showMarkerAt(point);
-            }
-        }, ScreenSpaceEventType.LEFT_DOWN);
+        this._handler.setInputAction(
+            (event) => this._beginGesture("spin", event.position),
+            ScreenSpaceEventType.LEFT_DOWN,
+        );
+        this._handler.setInputAction(() => this._endGesture(), ScreenSpaceEventType.LEFT_UP);
 
-        this._handler.setInputAction(() => this._hideMarker(), ScreenSpaceEventType.LEFT_UP);
+        this._handler.setInputAction(
+            (event) => this._beginGesture("tilt", event.position),
+            ScreenSpaceEventType.RIGHT_DOWN,
+        );
+        this._handler.setInputAction(() => this._endGesture(), ScreenSpaceEventType.RIGHT_UP);
+    }
+
+    // Set the gesture BEFORE resolving the pivot so _pivotPoint knows to refine (Cesium's
+    // controller re-picks during the drag; the gesture is already set by then), then show
+    // the crosshair on the resolved pivot.
+    _beginGesture(name, position) {
+        this._gesture = name;
+        if (this._isFlyActive() || this._isMeasureActive()) return;
+        const point = this._pivotPoint(position);
+        if (point) {
+            this._showMarkerAt(point);
+        }
+    }
+
+    _endGesture() {
+        this._gesture = null;
+        this._hideMarker();
+    }
+
+    // --- measurement resolution ---------------------------------------------
+
+    // Resolve a precise world point at a pixel for measurement, using the "measure" policy
+    // (exact-pixel first, tight forgiveness — a direct hit is never stolen). A mesh depth hit
+    // is returned as-is (already per-pixel accurate); a splat hit is refined against the
+    // full-density splat centres for the ± spread.
+    // Returns { point, source: 'mesh'|'splat', spread, count, ms } or undefined on a miss.
+    resolveMeasurement(windowPosition) {
+        const hit = this._resolveTiered(windowPosition, "measure");
+        if (!hit) return undefined;
+
+        if (this._lastResolveSource === "mesh") {
+            return {point: Cartesian3.clone(hit, new Cartesian3()), source: "mesh", spread: 0, count: 1, ms: 0};
+        }
+
+        const refined = this._splatSource.refine(this._scene, hit, MEASURE_REFINE_RADIUS_PX);
+        if (!refined) {
+            return {point: hit, source: "splat", spread: 0, count: 0, ms: 0};
+        }
+        return {
+            point: refined.aggregate,
+            source: "splat",
+            spread: refined.spread,
+            count: refined.count,
+            ms: refined.ms,
+        };
     }
 }
 

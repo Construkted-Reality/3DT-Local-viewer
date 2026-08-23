@@ -60,14 +60,26 @@ both formats and the query state machine: `web-page/src/formatPerfWindow.test.mj
 ## Rotation-centre snapping (`RotationCenterSnap.js`)
 
 Orbit/tilt/zoom snap their pivot to the nearest tileset point under the cursor, and a
-crosshair marker shows the rotation centre during left-drag. This is done **without
-forking Cesium**: the stock `ScreenSpaceCameraController` derives every gesture's pivot
-from `scene.pickPositionWorldCoordinates`, so we shadow that one instance method with a
-9-sample neighbourhood search (cursor pixel + a ring at `SNAP_RADIUS_PX`) and return the
-hit **nearest the camera**. Nearest-to-camera (not nearest-to-cursor) is what makes a
-click through a hole in e.g. a lattice tower snap to the near member rather than the far
-background. A genuine miss returns `undefined` (no fallback — the globe is hidden), so the
-controller just rotates in place.
+crosshair marker shows the rotation centre during an orbit drag (left = spin, right = tilt).
+This is done **without forking Cesium**: the stock `ScreenSpaceCameraController` derives
+every gesture's pivot from `scene.pickPositionWorldCoordinates`, so we shadow that one
+instance method.
+
+- **Tiered pick** (`pickTiers.js`, `PICK_POLICY` in `RotationCenterSnap.js`): try screen
+  radii from small to large, stop at the first tier that hits, **nearest-to-camera within a
+  tier** (foreground preference — a lattice member a few px away beats the far background
+  seen through a hole). The radii are tuned on **two axes**:
+  - *Operation*: **pivot** is forgiving (tier 0 is a small ring, so a closer surface just off
+    the cursor takes the rotation centre); **measurement** is precise (tier 0 is the exact
+    pixel, so a direct hit on far geometry is never stolen by a nearer thing a few px away —
+    forgiveness only expands outward on a true miss).
+  - *Tileset type*: **gs** uses wider radii than **mesh**/point-cloud (decimated splat centres
+    are sparser on screen than per-pixel depth). Mesh & point cloud share one column.
+  - Defaults: `pivot {mesh:[5,16], gs:[8,28]}`, `measure {mesh:[0,2,5], gs:[4,10,20]}` — FEEL
+    constants, tune by clicking. The measure-mode **hover preview** (`MeasureTool`, a hollow
+    ring) shows where a click would land so a bad radius is obvious before committing.
+- A genuine miss (nothing in any tier) returns `undefined` (no fallback — the globe is
+  hidden), so the controller just rotates in place.
 
 - Verified against real 1.142 with `tools/pivot-probe.js` (which gesture calls the pick,
   how often) and `tools/verify-snap.js` (the feature: near-miss snaps, far pixel doesn't,
@@ -75,9 +87,10 @@ controller just rotates in place.
 - The marker is a **DOM overlay** (`_markerEl` in `viewer.container`), NOT a Cesium
   billboard. A billboard renders in the TRANSLUCENT pass (9) but Gaussian splats render
   later (GAUSSIAN_SPLATS pass 11) and paint over it, so a billboard marker is invisible on
-  splats. The DOM element sits above the canvas and shows on any content; while a left-drag
-  is active we project the fixed world pivot to the screen each `postRender` (the camera
-  orbits it). It has a dark halo so it reads on bright (over-exposed splat) backgrounds.
+  splats. The DOM element sits above the canvas and shows on any content; while an orbit
+  drag (left/right) is active we project the fixed world pivot to the screen each
+  `postRender` (the camera orbits it). It has a dark halo so it reads on bright (over-exposed
+  splat) backgrounds.
 - **Gaussian-splat tilesets** (`SplatPivotSource.js`): splats are NOT depth-pickable in
   1.142 — `pickPositionWorldCoordinates` and `scene.pick` both return nothing (they write
   no depth, carry no pick id; upstream CesiumGS/cesium#13326). So when the mesh depth-pick
@@ -89,6 +102,18 @@ controller just rotates in place.
   An invisible depth-writing point overlay was rejected: opaque depth points occlude the
   translucent splats (black holes). Verified with `tools/gs-verify.js` against a real
   `KHR_gaussian_splatting` tileset (snap resolves, marker visible, camera orbits, no crash).
+- **Spin/tilt pivot refine** (`SplatPivotSource.refine`, `_pivotPoint`): for a splat-derived
+  pivot on **spin (left-drag) and tilt (right-drag) only** — each picks once per gesture —
+  the decimated centre is refined to full density (`_positions` scanned in the tileset local
+  frame, opacity-weighted k-nearest → the pivot). **Zoom is left on the decimated `query()`**
+  (it picks 40-60x/gesture; refining there would reintroduce the per-frame O(N) cost). The
+  active gesture is tracked by the LEFT/RIGHT down/up handlers; `_lastResolveSource` gates
+  refine to splat pivots (mesh depth is already exact). `_refineCount` instruments this for
+  `tools/gs-measure-verify.js` (asserts tilt refines, zoom does not). Note: Cesium's
+  "rotate" = spin/grab-surface, "tilt" = orbit-around-point — the names are counter-intuitive.
+- **Measurement** (`MeasureTool.js`, `resolveMeasurement`): same full-density refine, one-shot
+  per click, with an opacity-weighted-mean point + k-nearest spread (the ± uncertainty).
+  DOM/SVG overlay (not in-scene geometry — splats paint over the translucent pass).
 - TODO (Adrian wants to try later): replace the pick-wrap by **owning the orbit/pan/zoom
   handlers** directly (disable Cesium's `rotate`/`tilt`/`zoom` event types and drive the
   camera ourselves around the resolved pivot). More code and we'd re-tune the interaction

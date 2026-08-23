@@ -18,6 +18,7 @@ import {CesiumFLYCameraController} from "./CesiumFLYCameraController";
 import {NavigationControlbar} from "./NavigationControlbar"
 import {mirrorTilesetSettings} from "./mirrorTilesetSettings";
 import {RotationCenterSnap} from "./RotationCenterSnap";
+import {MeasureTool} from "./MeasureTool";
 
 class TilesetViewer {
     constructor() {
@@ -97,7 +98,16 @@ class TilesetViewer {
         this._rotationCenterSnap = new RotationCenterSnap({
             viewer: this._viewer,
             isFlyActive: () => this._flyController.started(),
+            isMeasureActive: () => this._measureTool && this._measureTool.isActive(),
             getTilesets: () => [this._leftTileset, this._rightTileset],
+        });
+
+        // Two-point distance measurement (mesh + full-density-refined GS). Uses the snap's
+        // resolveMeasurement for picking. See MeasureTool.js.
+        this._measureTool = new MeasureTool({
+            viewer: this._viewer,
+            snap: this._rotationCenterSnap,
+            isFlyActive: () => this._flyController.started(),
         });
 
         const controlbarContainer = document.createElement("div");
@@ -110,13 +120,12 @@ class TilesetViewer {
             viewer: this._viewer,
             container: controlbarContainer,
             flyController: this._flyController,
+            measureTool: this._measureTool,
         });
 
-        // TODO(measurement): re-enable measurement tools.
-        // The previous bundled CesiumMeasurementPlugin.js targeted Cesium 1.81's
-        // internals and breaks against 1.142 (Cesium.EMPTY_OBJECT no longer exposed).
-        // Replace with a current-Cesium-compatible measurement implementation
-        // (or rewrite using the public Cesium API).
+        // Measurement: MeasureTool (above) is a current-Cesium two-point tool wired to the
+        // MEASURE control-bar button. The old bundled CesiumMeasurementPlugin.js targeted
+        // Cesium 1.81 internals and is left dormant; do not resurrect it.
 
         this._tilesetLoadError = new Cesium.Event();
         this._tilesetLoaded = new Cesium.Event();
