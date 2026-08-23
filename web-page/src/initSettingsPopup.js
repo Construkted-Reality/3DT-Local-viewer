@@ -1,5 +1,6 @@
 import {Cesium3DTileset} from "./CesiumJsInc.js";
 import {getAppVersion} from "./appVersion.js";
+import {DynamicMsaa} from "./DynamicMsaa.js";
 
 // The SSE slider runs 0..SSE_SLIDER_MAX and maps inversely to screen-space
 // error (higher slider = lower SSE = higher detail). Keep both directions in sync.
@@ -143,21 +144,37 @@ function initSettingsPopup() {
     // Multisampling. scene.msaaSamples is a live property (default 4). A value
     // of 1 turns it off. The scene ignores it when the context has no MSAA
     // support, so disable the control in that case.
+    //
+    // The selector no longer writes the property itself. DynamicMsaa owns it,
+    // because the second control below can hold the chosen count back until the
+    // camera stops. With that control off, DynamicMsaa passes the choice
+    // straight through.
     const msaaSelect = jQuery('#msaa-samples-select');
+    const msaaDynamicCheckbox = jQuery('#msaa-dynamic-checkbox');
     const msaaScene = window.tilesetViewer.viewer.scene;
 
     if (msaaScene.msaaSupported) {
-        msaaSelect.val(String(msaaScene.msaaSamples));
+        const dynamicMsaa = new DynamicMsaa({scene: msaaScene});
+
+        // Other code reads the state through the viewer: the verification tool
+        // in tools/dynamic-msaa-verify.js needs the transition count.
+        window.tilesetViewer.dynamicMsaa = dynamicMsaa;
+
+        msaaSelect.val(String(dynamicMsaa.targetSamples));
+        dynamicMsaa.setEnabled(msaaDynamicCheckbox.prop('checked'));
 
         msaaSelect.change(function () {
-            const scene = window.tilesetViewer.viewer.scene;
+            dynamicMsaa.setTargetSamples(parseInt(this.value, 10));
+        });
 
-            scene.msaaSamples = parseInt(this.value, 10);
-            scene.requestRender();
+        msaaDynamicCheckbox.change(function () {
+            dynamicMsaa.setEnabled(this.checked);
         });
     } else {
         msaaSelect.val('1');
         msaaSelect.prop('disabled', true);
+        msaaDynamicCheckbox.prop('checked', false);
+        msaaDynamicCheckbox.prop('disabled', true);
     }
 
     initPerformanceReadout();

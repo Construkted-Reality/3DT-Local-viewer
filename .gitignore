@@ -27,3 +27,7 @@ out/
 /tools/traces/gs-spike.json
 /tools/traces/gs-spike-v1.png
 /tools/traces/gs-spike-v2.png
+
+# Regenerable probe output (tools/dynamic-msaa-verify.js)
+/tools/traces/dynamic-msaa-verify.json
+/tools/traces/dynamic-msaa-probe.json
