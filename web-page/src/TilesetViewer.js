@@ -57,6 +57,13 @@ class TilesetViewer {
         scene.sun.show = false;
         scene.backgroundColor = Color.fromCssColorString("#333333");
 
+        // Multisampling off by default. Cesium uses 4 samples, which costs GPU
+        // memory and GPU time on every drawn frame. This viewer shows large
+        // local tilesets, where that budget is better spent on tiles. The
+        // Multisampling control in the settings panel turns it on (2 or 4
+        // samples), and that control reads its start value from here.
+        scene.msaaSamples = 1;
+
         // customize credit display
 
         jQuery(".cesium-toolbar-button").hide();
