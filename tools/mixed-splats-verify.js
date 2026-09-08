@@ -38,6 +38,19 @@ async function inspect(window) {
         const primitive = tileset && tileset.gaussianSplatPrimitive;
         const snap = application._rotationCenterSnap;
         const source = snap._splatSource;
+        // Cesium stores each RGB coefficient in two packed half-float words.
+        const packedHarmonics = primitive?._shData || [];
+        const half = value => {
+            const sign = value & 0x8000 ? -1 : 1;
+            const exponent = (value >>> 10) & 31;
+            const fraction = value & 1023;
+            if (exponent === 31) return fraction ? NaN : sign * Infinity;
+            return sign * (exponent ? (1 + fraction / 1024) * 2 ** (exponent - 15) : fraction * 2 ** -24);
+        };
+        const harmonics = [];
+        for (let i = 0; i < packedHarmonics.length; i += 2) {
+            harmonics.push(half(packedHarmonics[i] & 0xffff), half(packedHarmonics[i] >>> 16), half(packedHarmonics[i + 1] & 0xffff));
+        }
         source._ensureFresh();
         let pivot = false, measurement = false;
         const centers = source._centers;
@@ -54,6 +67,12 @@ async function inspect(window) {
             tilesLoaded: !!tileset && tileset.tilesLoaded,
             splats: primitive ? primitive._numSplats : 0,
             centers: centers.length / 3,
+            shDegree: primitive?._sphericalHarmonicsDegree || 0,
+            shValues: harmonics.length,
+            shPackedWords: packedHarmonics.length,
+            shNonzero: harmonics.reduce((count, value) => count + (value !== 0 ? 1 : 0), 0),
+            shFinite: harmonics.every(Number.isFinite),
+            shPrefix: Array.from(harmonics.slice(0, 3)),
             pivot, measurement,
             requestRenderMode: scene.requestRenderMode,
             unlimitedIdleTime: scene.maximumRenderTimeChange === Infinity,
@@ -151,10 +170,17 @@ app.whenReady().then(async () => {
                 if (record.observed.defaultRenderLoop) record.observed.visiblePixels = await visiblePixels(window);
                 const capture = await window.webContents.capturePage();
                 fs.writeFileSync(path.join(destination, `${path.basename(fixture.name)}.png`), capture.toPNG());
+                const expectedShValues = fixture.expectedSHDegree === undefined ? undefined :
+                    fixture.expectedSplats * ((fixture.expectedSHDegree + 1) ** 2 - 1) * 3;
+                const harmonicsPass = fixture.expectedSHDegree === undefined ||
+                    (record.observed.shDegree === fixture.expectedSHDegree && record.observed.shValues === expectedShValues &&
+                    record.observed.shFinite && (fixture.expectedSHDegree === 0 ||
+                    (record.observed.shNonzero > 0 && record.observed.shPrefix.length === 3 &&
+                    record.observed.shPrefix.every(value => Math.abs(value - fixture.expectedSHValue) <= 0.05))));
                 record.pass = record.observed.version === "1.142.0" && record.observed.splats === fixture.expectedSplats &&
                     record.observed.visiblePixels > 0 && record.observed.pivot && record.observed.measurement && record.observed.requestRenderMode &&
                     record.observed.unlimitedIdleTime && record.observed.dynamicMsaaPresent &&
-                    record.observed.defaultRenderLoop && record.observed.renderErrors.length === 0 && record.errors.length === 0;
+                    record.observed.defaultRenderLoop && harmonicsPass && record.observed.renderErrors.length === 0 && record.errors.length === 0;
             } catch (error) {
                 record.errors.push(String(error.stack || error));
                 if (window && !window.isDestroyed()) {
