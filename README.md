@@ -6,9 +6,11 @@ This viewer displays [3D Tiles](https://github.com/CesiumGS/3d-tiles) datasets o
 - No installation required (portable build)
 - No internet connection required
 - Supports 3D Tiles **1.0** and **1.1** (e.g. UltraMesh 2.x output) via Cesium 1.142
+- Displays compressed SPZ splats, uncompressed splats, and tilesets that contain both formats
 - Cross-platform: Windows, Linux, macOS
 
-> **Note:** The measurement tools available in earlier versions are temporarily disabled. The previous third-party measurement plugin was incompatible with current Cesium; a replacement is tracked as a TODO in `web-page/src/TilesetViewer.js`.
+Use **MEASURE** to select two points and read their distance. Gaussian splat
+measurements use nearby splat centres, with an uncertainty estimate.
 
 ## Requirements
 
@@ -52,6 +54,11 @@ yarn start
 ```
 
 `web-page/app.js` is gitignored — every fresh checkout needs step 2.
+
+The complete Cesium 1.142 distribution is tracked in Git. Its
+`build-provenance.json` identifies the source correction and generated files.
+See [the Cesium build inputs](tooling/README.md) for the reproducible export
+command. Application dependencies still use Yarn 1.
 
 ### Watching the renderer during development
 

@@ -3,7 +3,7 @@
   "repository": "https://github.com/Construkted-Reality/cesium.git",
   "upstreamCommit": "3d07db311da7e96a4dc5f0ee2a1c8b15d4a408f5",
   "correctionBaseCommit": "488b114e16f5879f5d51456640aae67850a715c0",
-  "correctionCommit": "976a21ece4a6c1d00a63ada06561ee544bd31641",
+  "correctionCommit": "9babb770321101c2685354bdcbf93429a9ddec9e",
   "dependencyLock": "cesium-1.142.package-lock.json",
   "dependencyLockSha256": "a23fa9719b8b77c3f88436e7ade167cd3e320b892de8ed9b855a7d99c98ba75d",
   "nodeVersion": "22.22.2",
