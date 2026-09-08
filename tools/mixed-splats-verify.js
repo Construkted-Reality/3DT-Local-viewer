@@ -57,13 +57,59 @@ async function inspect(window) {
             pivot, measurement,
             requestRenderMode: scene.requestRenderMode,
             unlimitedIdleTime: scene.maximumRenderTimeChange === Infinity,
-            dynamicMsaaPresent: !!application.dynamicMsaa
+            dynamicMsaaPresent: !!application.dynamicMsaa,
+            defaultRenderLoop: application.viewer.useDefaultRenderLoop,
+            pixelPhase: window.__splatPixelPhase,
+            renderErrors: window.__splatRenderErrors || [],
+            camera: scene.camera.positionWC,
+            sphere: tileset.boundingSphere,
+            selected: tileset._selectedTiles.length,
+            loaded: tileset.statistics.numberOfTilesWithContentReady,
+            pending: tileset.statistics.numberOfPendingRequests,
+            children: tileset.root.children.map(tile => ({state: tile._contentState, visible: tile._visible, sphere: tile.boundingSphere}))
         };
     })()`), "scene inspection");
 }
 
+async function visiblePixels(window) {
+    return bounded(window.webContents.executeJavaScript(`(async () => {
+        const application = window.tilesetViewer;
+        const scene = application.viewer.scene;
+        const tileset = application._leftTileset;
+        const gl = scene.canvas.getContext("webgl2");
+        const read = () => new Promise(resolve => {
+            const remove = scene.postRender.addEventListener(() => {
+                const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+                gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+                remove();
+                resolve(pixels);
+            });
+            // Request the next frame after the current postRender callback completes.
+            setTimeout(() => scene.requestRender(), 0);
+        });
+        window.__splatPixelPhase = "shown";
+        const shown = await read();
+        const original = tileset.show;
+        try {
+            tileset.show = false;
+            window.__splatPixelPhase = "hidden";
+            const hidden = await read();
+            let changed = 0;
+            for (let i = 0; i < shown.length; i += 4) {
+                if (Math.max(Math.abs(shown[i] - hidden[i]), Math.abs(shown[i + 1] - hidden[i + 1]),
+                    Math.abs(shown[i + 2] - hidden[i + 2])) > 2) changed++;
+            }
+            return changed;
+        } finally {
+            tileset.show = original;
+            window.__splatPixelPhase = "restore";
+            await read();
+        }
+    })()`), "rendered splat visibility");
+}
+
 app.whenReady().then(async () => {
-    const result = {cases: [], errors: []};
+    const result = {cases: [], errors: [], diagnosticFrameRequests: !!process.env.SPLAT_REQUEST_FRAMES};
     let window;
     try {
         if (!destination || !process.env.SPLAT_CASES) throw new Error("Set SPLAT_RESULTS and SPLAT_CASES");
@@ -80,10 +126,11 @@ app.whenReady().then(async () => {
                     preload: path.join(__dirname, "..", "preload.js")
                 }});
                 window.webContents.on("console-message", event => {
-                    if (event.level === 3) record.errors.push(event.message);
+                    if (event.level === 3 || event.level === "error") record.errors.push(event.message);
                 });
                 window.webContents.on("render-process-gone", (_, details) => record.errors.push(`Renderer exited: ${details.reason}`));
                 await bounded(window.loadFile(path.join(__dirname, "..", "web-page", "index.html")), "viewer load");
+                await window.webContents.executeJavaScript(`window.__splatRenderErrors = []; window.tilesetViewer.viewer.scene.renderError.addEventListener((scene, error) => window.__splatRenderErrors.push(String(error.stack || error))); true`);
                 let loadTimer;
                 try {
                     await Promise.race([
@@ -94,17 +141,20 @@ app.whenReady().then(async () => {
                 const deadline = Date.now() + 15000;
                 do {
                     await sleep(200);
+                    if (process.env.SPLAT_REQUEST_FRAMES) await window.webContents.executeJavaScript("window.tilesetViewer.viewer.scene.requestRender()");
                     record.observed = await inspect(window);
                     if (record.observed.tilesLoaded && record.observed.splats === fixture.expectedSplats) break;
                 } while (Date.now() < deadline);
                 await window.webContents.executeJavaScript("window.tilesetViewer.viewer.scene.requestRender()");
                 await sleep(500);
                 record.observed = await inspect(window);
+                if (record.observed.defaultRenderLoop) record.observed.visiblePixels = await visiblePixels(window);
                 const capture = await window.webContents.capturePage();
                 fs.writeFileSync(path.join(destination, `${path.basename(fixture.name)}.png`), capture.toPNG());
                 record.pass = record.observed.version === "1.142.0" && record.observed.splats === fixture.expectedSplats &&
-                    record.observed.pivot && record.observed.measurement && record.observed.requestRenderMode &&
-                    record.observed.unlimitedIdleTime && record.observed.dynamicMsaaPresent && record.errors.length === 0;
+                    record.observed.visiblePixels > 0 && record.observed.pivot && record.observed.measurement && record.observed.requestRenderMode &&
+                    record.observed.unlimitedIdleTime && record.observed.dynamicMsaaPresent &&
+                    record.observed.defaultRenderLoop && record.observed.renderErrors.length === 0 && record.errors.length === 0;
             } catch (error) {
                 record.errors.push(String(error.stack || error));
                 if (window && !window.isDestroyed()) {
