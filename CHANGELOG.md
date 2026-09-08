@@ -1,5 +1,20 @@
 # Change Log
 
+### 1.9.1 - 2026-09-08
+
+#### Fixed
+
+- The viewer renders uncompressed Gaussian splats and tilesets that combine uncompressed splats with SPZ content.
+- Uncompressed splats retain their higher-order spherical harmonic color coefficients.
+- Splat loading and sorting finish when the camera stops. Camera movement during a pending sort receives the required follow-up sort.
+- The viewer retains Cesium 1.142, rotation-centre picking, measurement, rendering on request, and dynamic multisampling.
+
+#### Added
+
+- A source export script pins the Cesium source, runtime correction, dependency lock and build tools.
+- The bundled distribution includes file hashes and source provenance.
+- A browser regression checks compressed, uncompressed, mixed and wide splat tilesets with the real viewer.
+
 ### 1.9.0 - 2026-08-23
 
 #### Added
