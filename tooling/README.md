@@ -15,3 +15,25 @@ Cesium source export, with `HUSKY` unset. This keeps all upstream preparation
 scripts enabled. CI mode skips browser system installation, while Husky reports
 the absent Git directory in the source export normally.
 Run compilation, tests and browser probes only on the test server.
+
+## Rebuild the complete distribution
+
+`cesium-build.json` pins the upstream source, the correction range and the build
+tools. The build script exports upstream 1.142.0, applies only engine runtime
+changes from the correction range, and runs the upstream release build.
+
+On 192.168.8.212, use a new output directory:
+
+```bash
+node tools/build-cesium.js tooling/cesium-build.json /mnt/data2/cesium-build /mnt/data2/cesium-export
+```
+
+The export contains the full `Build/Cesium` distribution and
+`build-provenance.json`. The provenance records the source commits, patch hash,
+dependency lock hash and every generated file hash. Keep the export together:
+the main bundle, workers and assets form one versioned artifact.
+
+After validation, replace the tracked `web-page/Cesium-1.142/Build/Cesium`
+directory with the complete export. Do not edit generated JavaScript or copy a
+single bundle over workers from another build. The script retains its isolated
+source directory so a reviewer can inspect the applied patch and build inputs.
